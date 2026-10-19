@@ -1,0 +1,50 @@
+# Cloud packaging/runtime artifacts
+/dist/
+/.cloud_bundle.env
+/*.tar.gz
+
+# Cloud launcher logs and manifests
+/logs/
+/results/
+/test/
+/result.txt
+/nohup.out
+/logs/cloud_mainline_*.log
+/logs/experiment_manifest_*.tsv
+
+# Cloud experiment outputs
+/thought/TableQA/data/*/*_rerank_cache/
+/thought/TableQA/data/*/test_reranked*.jsonl
+/thought/TableQA/data/*/error_data.jsonl
+/thought/TableFV/data/*/*_rerank_cache/
+/thought/TableFV/data/*/test_reranked*.jsonl
+/thought/TableFV/data/*/error_data.jsonl
+
+# Local editor / agent caches
+/.agents/
+/.claude/
+/.idea/
+/.vscode/
+/.zcf/
+/agents/__pycache__/
+/critic/**/__pycache__/
+/docs/**/__pycache__/
+/other_method/__pycache__/
+/preprocess_utils/__pycache__/
+/refine/**/__pycache__/
+/scripts/__pycache__/
+/table_structure/__pycache__/
+/tests/__pycache__/
+/thought/**/__pycache__/
+
+# One-off local files
+/CLAUDE.md
+/TORUN.txt
+/skills-lock.json
+/configs/
+/docs/*.md
+/docs/superpowers/specs/*.md
+/idea-stage/docs/
+/tests/
+
+*.log
