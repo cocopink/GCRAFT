@@ -54,7 +54,7 @@ P1_GAMMA="${P1_GAMMA:-0.1}"       # P1 gamma value (0.0 disables smoothing)
 ENABLE_ATGC="${ENABLE_ATGC:-false}" # ATGC: optional col-only rerank control experiment
 
 # ============== Results Path Configuration ==============
-RESULTS_BASE="test/results"
+RESULTS_BASE="${RESULTS_BASE:-test/results}"
 DATA_DIR="thought/TableFV/data/tabfact"
 ORIGINAL_DATA="${DATA_DIR}/test.jsonl"
 DATASET_TO_USE="$ORIGINAL_DATA"
@@ -85,6 +85,12 @@ if [ "$ENABLE_P1" = "true" ]; then
 else
     GRAPH_SUFFIX=""
 fi
+
+# ============== Error Tree Evolution (每实验独立进化树) ==============
+# False = 进化模式: 从 canonical 播种本实验私有树并在运行内进化
+# True  = 静态树消融: 读 canonical, 永不写
+FROZEN_MEMORY="${FROZEN_MEMORY:-False}"
+EVOLVE_TREE_JSON="${REFINE_RESULTS}${GRAPH_SUFFIX}/memory/few_shot_critic.json"
 
 # ============== Logging Setup ==============
 LOG_DIR="logs"
@@ -243,6 +249,11 @@ fi
 echo ""
 echo "Stage 2: Refine (Controller-driven)"
 echo "------------------------------------------"
+# 独立进化树: frozen 时读 canonical 静态树, 否则播种/续用本实验私有树
+EVOLVE_ARGS=""
+if [ "$FROZEN_MEMORY" != "True" ]; then
+    EVOLVE_ARGS="--critic_tree_json $EVOLVE_TREE_JSON"
+fi
 python refine/TableFV/main_tree_based.py \
 --thought_results_dir "${THOUGHT_RESULTS}${GRAPH_SUFFIX}" \
 --refine_results_dir "${REFINE_RESULTS}${GRAPH_SUFFIX}" \
@@ -252,7 +263,9 @@ python refine/TableFV/main_tree_based.py \
 --first_n $first_n \
 --n_proc $n_proc \
 --chunk_size $chunk_size \
---use_clarifier $([ "$MODE" = "new" ] && echo "True" || echo "False")
+--use_clarifier $([ "$MODE" = "new" ] && echo "True" || echo "False") \
+--frozen_memory $FROZEN_MEMORY \
+$EVOLVE_ARGS
 
 if [ $? -ne 0 ]; then
     echo "Error in Stage 2 Refine"
