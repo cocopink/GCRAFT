@@ -857,16 +857,19 @@ class ActionExecutor:
     负责执行 Controller 决策的动作，并更新状态
     """
     
-    def __init__(self, llm, llm_options, use_verifier=False, use_diff_critic=False, diff_critic_mode="diagnose_only"):
+    def __init__(self, llm, llm_options, use_verifier=False, use_diff_critic=False, diff_critic_mode="diagnose_only",
+                 frozen_memory: bool = False):
         """
         初始化执行器
 
         Args:
             llm: 语言模型实例
             llm_options: 模型选项
+            frozen_memory: 是否冻结测试期错误树写回
         """
         self.llm = llm
         self.llm_options = llm_options
+        self.frozen_memory = frozen_memory
         self.use_verifier = use_verifier
         self.use_diff_critic = use_diff_critic
         self.diff_critic_mode = diff_critic_mode
@@ -1062,7 +1065,7 @@ class ActionExecutor:
             state.sample = refine_sample
         
         elif action == ControllerAction.UPDATE_TREE:
-            if frozen_memory:
+            if self.frozen_memory:
                 if DEBUG:
                     print("[DEBUG UPDATE_TREE] frozen_memory=True, skip update_error_tree")
             else:
@@ -1340,7 +1343,7 @@ def controller_main_loop(
 
     # 初始化组件
     # 修复1：先创建 ActionExecutor 以获取 RetrieverAgent 实例
-    executor = ActionExecutor(llm, llm_options, use_verifier=use_verifier, use_diff_critic=use_diff_critic, diff_critic_mode=diff_critic_mode)
+    executor = ActionExecutor(llm, llm_options, use_verifier=use_verifier, use_diff_critic=use_diff_critic, diff_critic_mode=diff_critic_mode, frozen_memory=frozen_memory)
     # 将 retriever 传递给 controller，避免重复创建实例
     controller = MinimalController(llm, llm_options, max_iterations, retriever=executor.retriever)
     
