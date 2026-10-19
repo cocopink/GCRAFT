@@ -48,3 +48,6 @@
 /tests/
 
 *.log
+
+# flock 锁文件（错误树写盘防御派生）
+*.lock

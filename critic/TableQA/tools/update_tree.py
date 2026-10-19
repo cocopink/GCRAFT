@@ -1,9 +1,13 @@
 from thought.TableQA.utils.helper import table2string
 from .get_info import get_table_log, replace_leaves_with_end
 import copy
+import fcntl
 import json
+import os
 import re
 import random
+import tempfile
+from contextlib import contextmanager, nullcontext
 
 random.seed(42)
 
@@ -268,6 +272,37 @@ def _horizontal_expansion_orig(few_shot_dict, critic_template, llm, llm_options)
                 else:
                     break
 
+@contextmanager
+def error_tree_file_lock(error_tree_json):
+    """跨进程文件锁：按知识库路径派生锁文件（<path>.lock），flock 独占。
+
+    同一路径的多进程写互斥；不同路径（如每实验一棵独立树）天然隔离。
+    仅支持 POSIX（fcntl）；与调用方传入的 lock 参数嵌套时，本锁在外层。
+    """
+    lock_path = error_tree_json + ".lock"
+    os.makedirs(os.path.dirname(lock_path) or ".", exist_ok=True)
+    with open(lock_path, "w") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def _atomic_write_json(path, data):
+    """原子写 JSON：先写同目录临时文件再 os.replace 覆盖，读方永不读到半截。"""
+    dir_name = os.path.dirname(path) or "."
+    fd, tmp_path = tempfile.mkstemp(prefix=".few_shot_critic_", suffix=".tmp", dir=dir_name)
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=4)
+        os.replace(tmp_path, path)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
+
+
 def update_error_tree(sample, error_route, error_tree_json, llm, llm_options, lock, use_blueprint=True):
     # --- 构建 critic_template（两种模式共用） ---
     critic_template = ""
@@ -364,7 +399,11 @@ Provide only the blueprint sentence, nothing else."""
         horiz_fn = _horizontal_expansion_orig
         template_item = critic_template
 
-    with lock:
+    # 兼容旧契约：lock=None 表示无附加协议锁（互斥由文件锁保证）
+    if lock is None:
+        lock = nullcontext()
+
+    with error_tree_file_lock(error_tree_json), lock:
         try:
             with open(error_tree_json, 'r') as f:
                 few_shot_dict = json.load(f)
@@ -387,7 +426,6 @@ Provide only the blueprint sentence, nothing else."""
             else:
                 horiz_fn(few_shot_dict, template_item, llm, llm_options)
 
-            with open(error_tree_json, 'w') as f:
-                json.dump(few_shot_dict, f, indent=4)
+            _atomic_write_json(error_tree_json, few_shot_dict)
         finally:
             pass
