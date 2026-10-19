@@ -185,3 +185,19 @@ def _atomic_write_json(path, data):
 2. 函数级：mock `get_table_log` + mock llm 真调 `update_error_tree(error_route='random')` → 写盘落注入路径、`.lock` 生成
 3. 语义级：frozen=True 读 canonical 不写；frozen=False + 注入路径 → 自动播种；QA/FV 双测
 4. `bash -n` run 脚本 + grep 传参；py_compile 全部改动文件；每 Phase 一个 commit
+
+---
+
+## 9. 附录：2026-10-19 二次事件与处置记录
+
+Phase 0-5 修复当日发现，事故仍在主动造成损失：
+
+1. **当天 vLLM 批量实验全部中招**：`run_batch_vllm.sh`（15:21/17:03 两个实例）编排的运行经 `run_QA_vllm.sh`/`run_FV_vllm.sh` 入口，**不传 `--frozen_memory`**（默认 False）且未隔离——修复前的运行继续 NameError 崩溃（QA-0.8b 801 次/18.4% 最重），修复中途的运行则撞上过渡期 ImportError。量化见 `docs/incidents/2026-10-19_frozen_memory_impact_report.md`。
+2. **QA canonical 树被真实污染**：17:57:45，一次 frozen=False 的 vLLM QA 运行经 Phase 1 修复后的写路径（Phase 3 文件锁上线前，无锁）向 `critic/TableQA/tools/few_shot_critic.json` 写入 2 个新类目（`column error`、`column selection error`）+ 12 行案例，无 case_id/置信度字段。FV 树未受影响。
+3. **正在运行的 FV-2b refine 全部无效**：进程加载了 Phase 5 编辑中途的 controller（`reward_cases` 未导出），判对即崩。
+
+**处置**（2026-10-19 18:3x）：
+- 经用户确认停止全部 batch 实例（15:21/17:03）与 vllm serve；被污染 QA 树备份至 `/tmp/evolved_qa_tree_backup_20261019.json` 后 `git checkout` 恢复基线（35 类目）
+- `run_QA_vllm.sh` / `run_FV_vllm.sh` 镜像 Phase 2+4 参数（`FROZEN_MEMORY` env + `--critic_tree_json` 每实验私有树）——commit `fix(Phase 4 补丁)`
+- 评估脚本口径修正（NameError 与其他错误分列、pkl 新旧配对标注）并入库报告
+- 此后新起的运行自动播种独立树至 `<RESULTS_BASE>/refine/<dataset>/<model><suffix>/memory/few_shot_critic.json`，canonical 仅作只读播种源
