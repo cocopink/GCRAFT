@@ -110,5 +110,78 @@ Error refining sample 481: name 'frozen_memory' is not defined
 
 ## 7. 遗留决策
 
-- 3 组受影响实验（§2.2 表）是否重跑：待 Phase 4 影响评估报告产出后决定
+- 3 组受影响实验（§2.2 表）是否重跑：待影响评估报告（§8 Phase 6）产出后决定
 - `update_tree_orig.py`、`chain.py` 旧版管线：本次不动（非主线 / 锁已有效）
+
+---
+
+## 8. 演进设计：16 实验独立进化树 + 写盘防御 + 置信度遗忘（2026-10-19 定稿）
+
+> 本节为后续实施的准绳，取代 §5 的旧 Phase 编号。
+
+### 8.0 需求定稿
+
+启动 16 组云端实验时，**每组实验拥有独立错误树**：从原始树播种、仅在本实验运行内进化（n_proc 个 worker 共写本组树），实验间互不影响。默认进化（`frozen_memory=False`），`FROZEN_MEMORY=True` 保留为静态树消融开关。遗忘策略采用置信度衰减（LFU 风格）。
+
+### 8.1 总体架构
+
+```
+原始树 critic/Table*/tools/few_shot_critic.json  (只读, 永不被实验触碰)
+     │ 启动时播种 (仅当目标不存在 → shutil.copy, 支持断点续跑)
+     ▼
+results/cloud/<dataset>/<model>/<variant>/memory/few_shot_critic.json   ×16 组各自独立
+     ▲└ write: 文件锁内 读→扩展→结算置信度→剪枝→原子写
+     └ read: n_proc 个 worker 无锁读 (原子替换保证永不读半截)
+```
+
+### 8.2 写盘防御（Phase 3）
+
+`critic/Table{QA,FV}/tools/update_tree.py` 新增两原语（镜像）：
+
+```python
+@contextmanager
+def error_tree_file_lock(error_tree_json):
+    # 锁文件 = <知识库路径>.lock（同目录旁挂），fcntl.flock 独占
+    # 互斥对象是"文件"→跨进程天然有效；不同路径（不同实验的树）天然隔离
+    # 仅 POSIX；与调用方 lock 参数嵌套时本锁在外层，嵌套顺序固定
+
+def _atomic_write_json(path, data):
+    # 同目录 mkstemp → json.dump(indent=4) → os.replace 覆盖
+    # 异常时清理临时文件；读方任何时刻都读到完整 JSON
+```
+
+`update_error_tree` 内两处替换：`with lock:` → `with error_tree_file_lock(error_tree_json), lock:`；截断写 → `_atomic_write_json(...)`。
+
+**为何不用 `multiprocessing.Lock()`**：调用点 new 的 mp.Lock 每个 worker 各持一把独立实例，不构成互斥；文件锁是跨进程互斥的最小正确实现。锁覆盖读→树扩展（含 LLM 调用）→写全程，与旧 chain.py 路径 `manager.Lock` 语义一致；写仅在判对后发生，频率低。`.gitignore` 补 `*.lock`。
+
+### 8.3 路径注入 + 播种（Phase 4）
+
+| 调用方式 | 读 | 写 |
+|----------|----|----|
+| `frozen_memory=True` | canonical | 永不写（静态树消融） |
+| `frozen_memory=False` 无路径 | canonical | canonical（旧行为兼容） |
+| `frozen_memory=False` + `--critic_tree_json` | path（缺失则从 canonical 播种） | path（实验私有树） |
+
+贯通链：`main(critic_tree_json="")` → mp 元组 / 单线程调用点 → `controller_main_loop(error_tree_json="")` → `ActionExecutor(error_tree_json=...)` → `RetrieverAgent(memory_path=...)` + `update_error_tree(error_tree_json=...)`；空串回退 canonical。
+
+播种规则（main() 内）：frozen=False 且路径非空 → 不存在则 `shutil.copy(canonical, path)`；存在则续用（与 cache 断点续跑语义一致）。
+
+`run_QA.sh`/`run_FV.sh`：`FROZEN_MEMORY=${FROZEN_MEMORY:-False}`；树路径 `${REFINE_RESULTS}${GRAPH_SUFFIX}/memory/few_shot_critic.json`。`cloud_mainline.sh` **零改动**——结果目录按 dataset/model/variant 天然隔离 → 16 组 16 棵树。
+
+### 8.4 置信度遗忘（Phase 5，LFU 风格）
+
+1. 新案例结构追加 `"case_id": "<error_route>#<uuid8>"`、`"confidence_score": 1.0`（写入点 `template_dict`）；存量旧案例无 case_id → 结算自然跳过（兼容）
+2. executor DIAGNOSE 分支从 `pre_retrieved_few_shot`（案例 dict 列表，`multiprocess.py:82-122`）提取 case_id → `state.hit_case_ids`
+3. UPDATE_TREE（必然判对）锁内对命中案例 `confidence_score += 1`；首版不做失败 ×0.9 衰减（失败不写树，无结算时机）
+4. 每次写盘锁内 `memory.ActiveForgetting(max_cases=可配,默认 1e6).prune_low_confidence_cases(tree)` 再原子写——机制先通，阈值留实验配置
+
+### 8.5 历史影响评估（Phase 6）
+
+`scripts/assess_frozen_memory_impact.py`（只读）：日志提取 `Error refining sample (\d+)` → 定位 final_result.pkl → 总样本/崩溃数/崩溃样本当前判分 → Markdown 报告；重跑决策归用户。
+
+### 8.6 验证
+
+1. 原语级并发：8 进程 × 50 次（锁→读→改→原子写）同一临时树 → JSON 必可解析、计数无丢失、无 `.tmp` 残留
+2. 函数级：mock `get_table_log` + mock llm 真调 `update_error_tree(error_route='random')` → 写盘落注入路径、`.lock` 生成
+3. 语义级：frozen=True 读 canonical 不写；frozen=False + 注入路径 → 自动播种；QA/FV 双测
+4. `bash -n` run 脚本 + grep 传参；py_compile 全部改动文件；每 Phase 一个 commit
