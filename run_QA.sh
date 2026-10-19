@@ -147,7 +147,8 @@ python refine/TableQA/main_tree_based.py \
 --first_n $first_n \
 --n_proc $n_proc \
 --chunk_size $chunk_size \
---use_clarifier $([ "$MODE" = "new" ] && echo "True" || echo "False")
+--use_clarifier $([ "$MODE" = "new" ] && echo "True" || echo "False") \
+--frozen_memory True
 
 if [ $? -ne 0 ]; then
     echo "Error in Stage 2 Refine"
