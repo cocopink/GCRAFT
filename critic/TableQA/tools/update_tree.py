@@ -7,6 +7,7 @@ import os
 import re
 import random
 import tempfile
+import uuid
 from contextlib import contextmanager, nullcontext
 
 random.seed(42)
@@ -303,6 +304,32 @@ def _atomic_write_json(path, data):
         raise
 
 
+def reward_cases(error_tree_json, case_ids, delta=1.0):
+    """置信度结算：对本样本检索命中的案例 +delta（文件锁内读改写）。
+
+    存量案例无 case_id 字段时自动跳过；与 update_error_tree 的
+    读改写是两个独立事务，调用顺序上先结算后写新案例。
+    """
+    wanted = {c for c in (case_ids or []) if c}
+    if not wanted:
+        return
+
+    def _walk(node):
+        if isinstance(node, dict):
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            for case in node:
+                if isinstance(case, dict) and case.get("case_id") in wanted:
+                    case["confidence_score"] = min(10.0, case.get("confidence_score", 1.0) + delta)
+
+    with error_tree_file_lock(error_tree_json):
+        with open(error_tree_json, "r") as f:
+            tree = json.load(f)
+        _walk(tree)
+        _atomic_write_json(error_tree_json, tree)
+
+
 def update_error_tree(sample, error_route, error_tree_json, llm, llm_options, lock, use_blueprint=True):
     # --- 构建 critic_template（两种模式共用） ---
     critic_template = ""
@@ -387,7 +414,9 @@ Provide only the blueprint sentence, nothing else."""
 
         template_dict = {
             "blueprint": blueprint,
-            "content": critic_template
+            "content": critic_template,
+            "case_id": f"{error_route}#{uuid.uuid4().hex[:8]}",
+            "confidence_score": 1.0,
         }
 
         vert_fn = vertical_expansion
@@ -425,6 +454,13 @@ Provide only the blueprint sentence, nothing else."""
                     horiz_fn(few_shot_dict, template_item, llm, llm_options)
             else:
                 horiz_fn(few_shot_dict, template_item, llm, llm_options)
+
+            # 容量控制：置信度剪枝（阈值默认不触发，可用环境变量覆盖）
+            from memory.active_forgetting import ActiveForgetting
+            ActiveForgetting(
+                min_confidence=float(os.environ.get("ERROR_TREE_MIN_CONFIDENCE", "1e-07")),
+                max_cases=int(os.environ.get("ERROR_TREE_MAX_CASES", "1000000")),
+            ).prune_low_confidence_cases(few_shot_dict)
 
             _atomic_write_json(error_tree_json, few_shot_dict)
         finally:

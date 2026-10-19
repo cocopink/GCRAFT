@@ -850,6 +850,15 @@ Output JSON: {{"action": "...", "reason": "...", "confidence": 0.0-1.0}}""".form
 
 # ==================== 5. ActionExecutor 类 ====================
 
+def _hit_case_ids(state) -> List[str]:
+    """提取本样本检索命中的案例 ID（存量案例无 case_id 字段时自动跳过）。"""
+    return [
+        shot["case_id"]
+        for shot in (getattr(state, "retrieved_few_shot_examples", None) or [])
+        if isinstance(shot, dict) and shot.get("case_id")
+    ]
+
+
 class ActionExecutor:
     """
     动作执行器
@@ -941,6 +950,7 @@ class ActionExecutor:
                     retrieval_result = self.retriever.retrieve_by_route(error_route)
                     state.retrieved_blueprints = retrieval_result.get('blueprint')
                     pre_retrieved_few_shot = retrieval_result.get('few_shot_examples', [])
+                    state.retrieved_few_shot_examples = pre_retrieved_few_shot
                     
                     if DEBUG:
                         print(f"[DEBUG RETRIEVER] Retrieved blueprint: {state.retrieved_blueprints is not None}")
@@ -1036,13 +1046,16 @@ class ActionExecutor:
                 if DEBUG:
                     print("[DEBUG UPDATE_TREE] frozen_memory=True, skip update_error_tree")
             else:
-                from critic.TableFV.tools import update_error_tree
+                from critic.TableFV.tools import update_error_tree, reward_cases
                 # 调试信息
                 print(f"[DEBUG UPDATE_TREE] error_route: {state.error_route}")
                 print(f"[DEBUG UPDATE_TREE] sample keys: {list(state.sample.keys())}")
                 print(f"[DEBUG UPDATE_TREE] critique exists: {'critique' in state.sample}")
                 print(f"[DEBUG UPDATE_TREE] conclusion: {state.sample.get('conclusion', 'N/A')}")
                 
+                # 置信度结算：走到 UPDATE_TREE 必然判对，对本样本命中案例 +1
+                reward_cases(self.error_tree_json, _hit_case_ids(state))
+
                 # 使用 nullcontext() 替代 lock=None，支持上下文管理器协议
                 update_error_tree(
                     state.sample,
