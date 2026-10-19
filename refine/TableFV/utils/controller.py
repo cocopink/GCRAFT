@@ -857,7 +857,8 @@ class ActionExecutor:
     负责执行 Controller 决策的动作，并更新状态
     """
     
-    def __init__(self, llm, llm_options, frozen_memory: bool = False):
+    def __init__(self, llm, llm_options, frozen_memory: bool = False,
+                 error_tree_json: str = CRITIC_TREE_JSON):
         """
         初始化执行器
 
@@ -865,16 +866,18 @@ class ActionExecutor:
             llm: 语言模型实例
             llm_options: 模型选项
             frozen_memory: 是否冻结测试期错误树写回
+            error_tree_json: 错误树知识库路径（每实验独立进化树注入点，默认主线 canonical 树）
         """
         self.llm = llm
         self.llm_options = llm_options
         self.frozen_memory = frozen_memory
+        self.error_tree_json = error_tree_json
         
         # 初始化 RetrieverAgent（阶段2：独立检索器）
         from agents import RetrieverAgent
         self.retriever = RetrieverAgent(
             llm=llm,
-            memory_path=CRITIC_TREE_JSON
+            memory_path=error_tree_json
         )
     
     def execute(self, state: ControllerState, decision: Decision) -> ControllerState:
@@ -1044,7 +1047,7 @@ class ActionExecutor:
                 update_error_tree(
                     state.sample,
                     state.error_route or "random",
-                    error_tree_json=CRITIC_TREE_JSON,
+                    error_tree_json=self.error_tree_json,
                     llm=self.llm,
                     llm_options=self.llm_options,
                     lock=nullcontext(),
@@ -1140,6 +1143,7 @@ def controller_main_loop(
     use_clarifier: bool = True,
     thought_results_dir: Optional[str] = None,
     frozen_memory: bool = False,
+    error_tree_json: str = "",
 ) -> Dict[str, Any]:
     """
     Controller 主循环（集成 Clarifier）
@@ -1236,7 +1240,9 @@ def controller_main_loop(
     
     # 初始化组件
     # 修复1：先创建 ActionExecutor 以获取 RetrieverAgent 实例
-    executor = ActionExecutor(llm, llm_options, frozen_memory=frozen_memory)
+    # 知识库路径注入：空串回退主线 canonical 树
+    executor = ActionExecutor(llm, llm_options, frozen_memory=frozen_memory,
+                              error_tree_json=error_tree_json or CRITIC_TREE_JSON)
     # 将 retriever 传递给 controller，避免重复创建实例
     controller = MinimalController(llm, llm_options, max_iterations, retriever=executor.retriever)
     

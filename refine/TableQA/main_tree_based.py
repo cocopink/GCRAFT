@@ -1,5 +1,6 @@
 import multiprocessing as mp
 import pickle
+import shutil
 import subprocess
 import fire
 import os
@@ -16,7 +17,7 @@ from utils.evaluate import *
 from utils.chain import *
 from operations import *
 from tools import read_pkl
-from utils.controller import controller_main_loop
+from utils.controller import controller_main_loop, CRITIC_TREE_JSON
 
 
 def _resolve_openai_api_key(openai_api_key):
@@ -29,7 +30,8 @@ def _refine_one_sample_mp_core(arg):
     """Worker function for multiprocessing refinement of a single sample."""
     (llm, sample, sample_idx, llm_options, cache_dir,
      use_clarifier, thought_results_dir, max_iterations, frozen_memory,
-     use_verifier, use_diff_critic, diff_critic_mode, router_variant) = arg
+     use_verifier, use_diff_critic, diff_critic_mode, router_variant,
+     critic_tree_json) = arg
     try:
         refined = controller_main_loop(
             sample, llm=llm, llm_options=llm_options,
@@ -37,6 +39,7 @@ def _refine_one_sample_mp_core(arg):
             sample_idx=sample_idx, use_clarifier=use_clarifier,
             thought_results_dir=thought_results_dir,
             frozen_memory=frozen_memory,
+            error_tree_json=critic_tree_json,
             use_verifier=use_verifier,
             use_diff_critic=use_diff_critic,
             diff_critic_mode=diff_critic_mode,
@@ -59,6 +62,7 @@ def main(
     chunk_size=1,
     use_clarifier: bool = True,
     frozen_memory: bool = False,
+    critic_tree_json: str = "",
     use_verifier: bool = False,
     use_diff_critic: bool = False,
     diff_critic_mode: str = "diagnose_only",
@@ -96,6 +100,17 @@ def main(
     gpt_llm.set_token_log_dir(refine_results_dir, run_tag="wikitq_refine")
 
     # Use controller-based refinement
+    # 知识库注入与播种（每实验独立进化树；frozen=True 强制回退 canonical 静态树）
+    if frozen_memory:
+        if critic_tree_json:
+            print(f"[EvolveTree] frozen_memory=True, ignore critic_tree_json={critic_tree_json}")
+        critic_tree_json = ""
+    elif critic_tree_json and not os.path.exists(critic_tree_json):
+        os.makedirs(os.path.dirname(critic_tree_json) or ".", exist_ok=True)
+        shutil.copy(CRITIC_TREE_JSON, critic_tree_json)
+        print(f"[EvolveTree] Seeded error tree: {CRITIC_TREE_JSON} -> {critic_tree_json}")
+    print(f"Critic tree json: {critic_tree_json or 'default (canonical)'}")
+
     print("Using controller-based refinement...")
     print(f"Clarifier enabled: {use_clarifier}")
     print(f"Frozen memory enabled: {frozen_memory}")
@@ -125,7 +140,7 @@ def main(
             (gpt_llm, sample, idx, llm_options, cache_dir,
              use_clarifier, thought_results_dir, 2, frozen_memory,
              use_verifier, use_diff_critic, diff_critic_mode,
-             router_variant or None)
+             router_variant or None, critic_tree_json)
             for idx, sample in valid_entries if sample is not None
         ]
 
@@ -154,6 +169,7 @@ def main(
                 use_clarifier=use_clarifier,
                 thought_results_dir=thought_results_dir,
                 frozen_memory=frozen_memory,
+                error_tree_json=critic_tree_json,
                 use_verifier=use_verifier,
                 router_variant=router_variant or None,
                 use_diff_critic=use_diff_critic,

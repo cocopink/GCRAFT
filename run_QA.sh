@@ -85,6 +85,12 @@ else
     GRAPH_SUFFIX=""
 fi
 
+# ============== Error Tree Evolution (每实验独立进化树) ==============
+# False = 进化模式: 从 canonical 播种本实验私有树并在运行内进化
+# True  = 静态树消融: 读 canonical, 永不写
+FROZEN_MEMORY="${FROZEN_MEMORY:-False}"
+EVOLVE_TREE_JSON="${REFINE_RESULTS}${GRAPH_SUFFIX}/memory/few_shot_critic.json"
+
 echo "📝 Log: ${LOG_FILE}"
 
 # Redirect all subsequent output to both terminal and log file
@@ -138,6 +144,11 @@ fi
 echo ""
 echo "Stage 2: Refine (Controller-driven)"
 echo "------------------------------------------"
+# 独立进化树: frozen 时读 canonical 静态树, 否则播种/续用本实验私有树
+EVOLVE_ARGS=""
+if [ "$FROZEN_MEMORY" != "True" ]; then
+    EVOLVE_ARGS="--critic_tree_json $EVOLVE_TREE_JSON"
+fi
 python refine/TableQA/main_tree_based.py \
 --thought_results_dir "${THOUGHT_RESULTS}${GRAPH_SUFFIX}" \
 --refine_results_dir "${REFINE_RESULTS}${GRAPH_SUFFIX}" \
@@ -148,7 +159,8 @@ python refine/TableQA/main_tree_based.py \
 --n_proc $n_proc \
 --chunk_size $chunk_size \
 --use_clarifier $([ "$MODE" = "new" ] && echo "True" || echo "False") \
---frozen_memory True
+--frozen_memory $FROZEN_MEMORY \
+$EVOLVE_ARGS
 
 if [ $? -ne 0 ]; then
     echo "Error in Stage 2 Refine"
