@@ -8,6 +8,9 @@
 
 ## 变更记录 (Changelog)
 
+### 2026-10-23 (超长降级改进)
+- `TableQA/TableFV/utils/llm.py`：上下文超长错误改为「中段裁剪重试一次 → 仍失败才 PLACEHOLDER」，新增事件计数日志（`context_overflow_placeholder` / `moderation_placeholder` 写入 token 日志，`collect_token_usage` 聚合）
+
 ### 2026-09-21 (增量更新)
 - 更正 main.py 参数清单：QA 与 FV 现均支持 `--n_proc` / `--chunk_size`
 - 补录 ATGO 重排数据（`test_reranked_row.jsonl`）作为主线输入、结果目录 `_p12` 后缀约定

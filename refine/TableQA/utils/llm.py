@@ -1,5 +1,6 @@
 import openai
 from openai import OpenAI
+import re
 import time
 import numpy as np
 import requests
@@ -16,6 +17,7 @@ class LLM:
         self.output_tokens = 0
         self._token_log_dir = None
         self._run_tag = ""
+        self.event_counts = {}
 
     @property
     def _is_ollama_qwen(self):
@@ -141,6 +143,51 @@ class LLM:
 
         return MockResponse()
 
+    def _log_event(self, event, **extra):
+        """异常事件（超长/审核降级）写入 token 日志并计数；token 量字段恒为 0，不影响用量汇总。"""
+        self.event_counts[event] = self.event_counts.get(event, 0) + 1
+        if self._token_log_dir is None:
+            return
+        import json, os, time
+        tag = self._run_tag or "unknown"
+        log_path = os.path.join(self._token_log_dir, f"token_{tag}_{os.getpid()}.jsonl")
+        entry = {
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "pid": os.getpid(),
+            "model": self.model_name,
+            "event": event,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+        }
+        entry.update(extra)
+        with open(log_path, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+
+    def _truncate_messages_for_context(self, messages, error_text):
+        """按超长报错中的限额裁剪 user 消息中段（保留首尾），返回新 messages。
+
+        报错无法解析出限额/实际值时不裁剪，返回 None（由调用方走 PLACEHOLDER 兜底）。
+        """
+        nums = re.findall(r"(\d+)\s*tokens", error_text)
+        if len(nums) < 2:
+            return None
+        limit_tokens, requested_tokens = int(nums[0]), int(nums[1])
+        if requested_tokens <= limit_tokens:
+            return None
+        content = messages[-1]["content"]
+        # 1 token ≈ 4 字符的粗略估计，另留 5% 余量
+        keep_ratio = max(0.1, min(1.0, limit_tokens * 0.95 / requested_tokens))
+        keep_chars = max(200, int(len(content) * keep_ratio))
+        head, tail = keep_chars // 2, keep_chars - keep_chars // 2
+        content = (
+            content[:head]
+            + "\n...[TRUNCATED DUE TO CONTEXT LIMIT]...\n"
+            + content[len(content) - tail:]
+        )
+        messages = list(messages)
+        messages[-1] = dict(messages[-1], content=content)
+        return messages
+
     def generate_plus_with_score(self, prompt, options=None, end_str=None):
         if options is None:
             options = self.get_model_options()
@@ -177,6 +224,7 @@ class LLM:
             base_url=self.base,
             timeout=600.0,  # 10分钟超时，适应单线程处理
         )
+        truncated_once = False
         while gpt_responses is None:
             try:
                 print("1 options",options)
@@ -192,11 +240,25 @@ class LLM:
                 # 检查是否是内容审核错误（不可恢复）
                 if "data_inspection_failed" in str(e) or "inappropriate content" in str(e):
                     print(f"[WARNING] Content moderation error, skipping with PLACEHOLDER...", flush=True)
+                    self._log_event("moderation_placeholder")
                     gpt_responses = self._create_mock_response()
                     error = None
                     break  # 不要重试内容审核错误
                 elif "This model's maximum context length is" in str(e):
-                    print(e, flush=True)
+                    # 超长：先裁剪 prompt 重试一次，仍超长或无法解析限额才降级 PLACEHOLDER
+                    if not truncated_once:
+                        truncated = self._truncate_messages_for_context(messages, str(e))
+                        if truncated is not None:
+                            messages = truncated
+                            truncated_once = True
+                            print(f"[WARNING] Context overflow, prompt truncated and retrying once: {e}", flush=True)
+                            continue
+                    nums = re.findall(r"(\d+)\s*tokens", str(e))
+                    extra = (
+                        {"limit_tokens": int(nums[0]), "requested_tokens": int(nums[1])}
+                        if len(nums) >= 2 else {}
+                    )
+                    self._log_event("context_overflow_placeholder", **extra)
                     gpt_responses = self._create_mock_response()
                     error = None
                 elif retry_num > retry_limit:
@@ -254,6 +316,7 @@ class LLM:
             base_url=self.base,
             timeout=600.0,  # 10分钟超时，适应单线程处理
         )
+        truncated_once = False
         while gpt_responses is None:
             try:
                 print("2 options",options)
@@ -269,11 +332,25 @@ class LLM:
                 # 检查是否是内容审核错误（不可恢复）
                 if "data_inspection_failed" in str(e) or "inappropriate content" in str(e):
                     print(f"[WARNING] Content moderation error, skipping with PLACEHOLDER...", flush=True)
+                    self._log_event("moderation_placeholder")
                     gpt_responses = self._create_mock_response()
                     error = None
                     break  # 不要重试内容审核错误
                 elif "This model's maximum context length is" in str(e):
-                    print(e, flush=True)
+                    # 超长：先裁剪 prompt 重试一次，仍超长或无法解析限额才降级 PLACEHOLDER
+                    if not truncated_once:
+                        truncated = self._truncate_messages_for_context(messages, str(e))
+                        if truncated is not None:
+                            messages = truncated
+                            truncated_once = True
+                            print(f"[WARNING] Context overflow, prompt truncated and retrying once: {e}", flush=True)
+                            continue
+                    nums = re.findall(r"(\d+)\s*tokens", str(e))
+                    extra = (
+                        {"limit_tokens": int(nums[0]), "requested_tokens": int(nums[1])}
+                        if len(nums) >= 2 else {}
+                    )
+                    self._log_event("context_overflow_placeholder", **extra)
                     gpt_responses = self._create_mock_response()
                     error = None
                 elif retry_num > retry_limit:
@@ -324,7 +401,8 @@ class LLM:
         return {
             'input_tokens': self.input_tokens,
             'output_tokens': self.output_tokens,
-            'total_tokens': self.input_tokens + self.output_tokens
+            'total_tokens': self.input_tokens + self.output_tokens,
+            'events': dict(self.event_counts),
         }
 
     def save_token_usage(self, filepath):
@@ -346,6 +424,7 @@ class LLM:
         total_output = 0
         total_calls = 0
         model = "unknown"
+        events = {}
         log_files = glob.glob(os.path.join(log_dir, "token_*.jsonl"))
         for lf in log_files:
             with open(lf, "r") as f:
@@ -354,6 +433,10 @@ class LLM:
                     if not line:
                         continue
                     entry = json.loads(line)
+                    if "event" in entry:
+                        # 事件行（超长/审核降级）不计入 token 用量
+                        events[entry["event"]] = events.get(entry["event"], 0) + 1
+                        continue
                     total_input += entry.get("prompt_tokens", 0)
                     total_output += entry.get("completion_tokens", 0)
                     total_calls += 1
@@ -367,6 +450,7 @@ class LLM:
             "input_tokens": total_input,
             "output_tokens": total_output,
             "total_tokens": total_input + total_output,
+            "events": events,
         }
         total = total_input + total_output
         if total > 0:
