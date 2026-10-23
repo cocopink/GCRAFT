@@ -54,8 +54,7 @@ def _cache_path(cache_dir: str, sample_id: str, metadata: Dict) -> str:
         f"{sample_id}.schema-{metadata['schema_version']}"
         f".mode-{metadata['rerank_mode']}"
         f".gamma-{metadata['gamma']}"
-        f".hint-{int(metadata['inject_graph_hint'])}"
-        f".bias-{metadata['bias_weight']}.pkl"
+        f".hint-{int(metadata['inject_graph_hint'])}.pkl"
     )
     return os.path.join(cache_dir, name)
 
@@ -77,12 +76,10 @@ class ATGOReranker:
         cache_dir: Optional[str] = None,
         gamma: float = 0.0,
         inject_graph_hint: bool = False,
-        bias_weight: float = 0.0,
     ):
         self.cache_dir = cache_dir
         self.gamma = gamma
         self.inject_graph_hint = inject_graph_hint
-        self.bias_weight = bias_weight
 
     def _metadata(self) -> Dict:
         return {
@@ -90,7 +87,6 @@ class ATGOReranker:
             "rerank_mode": "row",
             "gamma": self.gamma,
             "inject_graph_hint": self.inject_graph_hint,
-            "bias_weight": self.bias_weight,
         }
 
     def _load_cache(self, sample: Dict, cache_path: str) -> bool:
@@ -201,12 +197,10 @@ class ATGCReranker:
         cache_dir: Optional[str] = None,
         gamma: float = 0.0,
         inject_graph_hint: bool = False,
-        bias_weight: float = 0.0,
     ):
         self.cache_dir = cache_dir
         self.gamma = gamma
         self.inject_graph_hint = inject_graph_hint
-        self.bias_weight = bias_weight
 
     def _metadata(self) -> Dict:
         return {
@@ -214,7 +208,6 @@ class ATGCReranker:
             "rerank_mode": "col",
             "gamma": self.gamma,
             "inject_graph_hint": self.inject_graph_hint,
-            "bias_weight": self.bias_weight,
         }
 
     def _load_cache(self, sample: Dict, cache_path: str) -> bool:

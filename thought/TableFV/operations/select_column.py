@@ -18,7 +18,7 @@ import copy
 import re
 import numpy as np
 from utils.helper import table2df, NoIndent, MyEncoder
-from table_structure.graph_bias import apply_graph_bias, canonicalize_candidate
+from table_structure.candidate import canonicalize_candidate
 
 from third_party.select_column_row_prompts.select_column_row_prompts import select_column_demo
 
@@ -84,13 +84,6 @@ def select_column_func(sample, table_info, llm, llm_options, debug=False, num_ro
         pred_conf_dict[pred] += np.exp(score)
 
     select_col_rank = sorted(pred_conf_dict.items(), key=lambda x: x[1], reverse=True)
-    bias_weight = sample.get("graph_metadata", {}).get("bias_weight", sample.get("_bias_weight", 0.0))
-    select_col_rank = apply_graph_bias(
-        select_col_rank,
-        sample.get("col_relevance_scores", sample.get("_col_relevance_scores", {})),
-        bias_weight,
-        "column",
-    )
 
     thought = "Filter out useless columns.\nsimilar words of the question link to columns:\n" + responses[0][0].split("Answer:")[0].strip() if "Answer:" in responses[0][0] else responses[0][0].strip() + "\n"
     

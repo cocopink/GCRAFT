@@ -8,6 +8,9 @@
 
 ## 变更记录 (Changelog)
 
+### 2026-10-20 (P3 下线)
+- `atgo_rerank.py` 移除 `bias_weight` 参数与缓存名 bias 段（随 P3 下线；缓存名变更使旧缓存一次性重算，仅 CPU 成本）
+
 ### 2026-09-21 (增量更新)
 - 补录 atgo_rerank.py（ATGOReranker / ATGCReranker，主线 Stage 0.7）
 - 补录 atg_rerank.py（ATGReranker，双 ATG 对照版，含 ImportError 隐患标注）
@@ -88,7 +91,7 @@ GRAPH_SCHEMA_VERSION = 1
 
 class ATGOReranker:
     """仅行重排：只构建行中心 ATG，列序保持原样"""
-    def __init__(self, cache_dir=None, gamma=0.0, inject_graph_hint=False, bias_weight=0.0)
+    def __init__(self, cache_dir=None, gamma=0.0, inject_graph_hint=False)
     def rerank_batch(dataset)   # 写入 atgo_reranked_table / graph_metadata / *_relevance_scores / graph_hint
 
 class ATGCReranker:
@@ -96,7 +99,7 @@ class ATGCReranker:
     # 参数与 ATGOReranker 相同，写入 atgc_reranked_table 等
 ```
 
-- 缓存路径编码实验开关：`{id}.schema-1.mode-row.gamma-0.1.hint-1.bias-0.0.pkl`（开关组合变化自动失效）
+- 缓存路径编码实验开关：`{id}.schema-1.mode-row.gamma-0.1.hint-1.pkl`（开关组合变化自动失效）
 - 输出统计 `Changed samples: N/M`，并写出 `_changed.jsonl` 精简文件（仅顺序改变的样本）
 - 命令行入口：根目录 `preprocess_atgo.py --mode row|col`
 

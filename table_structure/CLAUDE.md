@@ -8,6 +8,11 @@
 
 ## 变更记录 (Changelog)
 
+### 2026-10-20 (P3 下线)
+- 删除 `graph_bias.py`（P3 候选偏置，TabFact 165 样本消融证实：单独 +0.61pp 为噪声级，加入 P1+P2 反而 -1.82pp）
+- 候选归一化函数（`canonicalize_candidate` / `parse_column_candidate`）迁至 `candidate.py`，主线行为不变
+- `atgo_rerank.py` 缓存文件名去除 bias 段，旧缓存触发一次性重算（仅 CPU 成本）
+
 ### 2026-09-21 (增量更新)
 - 补录 5 个新文件：column_similarity.py、column_smoothing.py、context.py、graph_bias.py、value_similarity.py
 - 补录 qg_ppr.py 新 API：`*_with_scores` 系列、`power_iteration`、`rank_row_atg_columns_with_scores`
@@ -21,7 +26,7 @@
 
 ## 模块职责
 
-Table Structure 模块实现**双 ATG (Attributed Table Graph) + QG-PPR (Question-Guided Personalized PageRank)** 表格结构增强，用于表格行列重排，并支撑主线的 P1/P2/P3 三类实验开关。
+Table Structure 模块实现**双 ATG (Attributed Table Graph) + QG-PPR (Question-Guided Personalized PageRank)** 表格结构增强，用于表格行列重排，并支撑主线的 P1/P2 两类实验开关。
 
 参考论文: Beyond Linearization: Attributed Table Graphs for Table Reasoning (arXiv:2601.08444)
 
@@ -31,7 +36,7 @@ Table Structure 模块实现**双 ATG (Attributed Table Graph) + QG-PPR (Questio
 2. **QG-PPR 重要性排序**: 基于问题的个性化 PageRank 计算行列重要性（带分数输出版本供图提示使用）
 3. **P1 gamma 平滑**: `column_smoothing.py` 列间相似度混合传播矩阵
 4. **P2 图提示**: `context.py` 生成 Refine 可消费的 `[Graph Hint]` 文本
-5. **P3 候选偏置**: `graph_bias.py` 解析 LLM 候选并施加图先验重排
+5. **候选归一化**: `candidate.py` 解析 LLM 输出的行列候选（select_row/select_column 主线路径）
 6. **序列化**: 重排后的表格转为列表格式或 Markdown 文本
 
 ---
@@ -159,13 +164,11 @@ def get_graph_hint(sample, top_k=3) -> str
     """按 graph_metadata.inject_graph_hint 开关返回缓存的 graph_hint 或现算提示"""
 ```
 
-### graph_bias.py - 候选偏置（P3）
+### candidate.py - 候选解析与归一化（原 graph_bias.py，P3 偏置已随下线移除）
 
 ```python
-def parse_column_candidate(candidate: str) -> List[str]   # 解析 LLM 输出的列候选
-def parse_row_candidate(candidate: str) -> List[int]      # 解析行候选
-def canonicalize_candidate(candidate, candidate_type) -> str
-def apply_graph_bias(...)                                  # 用图相关性分数重排候选
+def parse_column_candidate(candidate: str) -> List[str]        # 解析 LLM 输出的列候选
+def canonicalize_candidate(candidate, candidate_type) -> str   # 候选归一化（select_row/select_column 无条件调用）
 ```
 
 ### serializer.py - 序列化
@@ -209,7 +212,7 @@ def unique_preserve_order(values) -> List[str]
 
 ### 样本级图字段（由 atgo_rerank 写入 JSONL）
 
-`graph_metadata`（schema_version/rerank_mode/gamma/inject_graph_hint/bias_weight）、`row_relevance_scores`、`col_relevance_scores`、`graph_hint`、`atgo_reranked_table` / `atgc_reranked_table`、`_atgo_order_changed` / `_atgc_order_changed`。
+`graph_metadata`（schema_version/rerank_mode/gamma/inject_graph_hint）、`row_relevance_scores`、`col_relevance_scores`、`graph_hint`、`atgo_reranked_table` / `atgc_reranked_table`、`_atgo_order_changed` / `_atgc_order_changed`。
 
 ---
 
@@ -253,6 +256,6 @@ def unique_preserve_order(values) -> List[str]
 - `table_structure/column_similarity.py` - 列相似度矩阵
 - `table_structure/column_smoothing.py` - P1 gamma 平滑传播矩阵
 - `table_structure/context.py` - P2 图提示构造
-- `table_structure/graph_bias.py` - P3 候选解析与偏置
+- `table_structure/candidate.py` - 候选解析与归一化
 - `table_structure/value_similarity.py` - 值归一化/相似度/合并判定
 - `table_structure/serializer.py` - 序列化 (rerank_table, rerank_table_to_text)

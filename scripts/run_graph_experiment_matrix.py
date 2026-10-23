@@ -42,51 +42,25 @@ EXPERIMENTS = [
         "name": "baseline",
         "gamma": 0.0,
         "inject_graph_hint": False,
-        "bias_weight": 0.0,
         "run_refine": True,
     },
     {
         "name": "P1",
         "gamma": 0.1,
         "inject_graph_hint": False,
-        "bias_weight": 0.0,
         "run_refine": False,
     },
     {
         "name": "P2",
         "gamma": 0.0,
         "inject_graph_hint": True,
-        "bias_weight": 0.0,
         "run_refine": True,
-    },
-    {
-        "name": "P3",
-        "gamma": 0.0,
-        "inject_graph_hint": False,
-        "bias_weight": 1.0,
-        "run_refine": False,
     },
     {
         "name": "P1+P2",
         "gamma": 0.1,
         "inject_graph_hint": True,
-        "bias_weight": 0.0,
         "run_refine": True,
-    },
-    {
-        "name": "P1+P3",
-        "gamma": 0.1,
-        "inject_graph_hint": False,
-        "bias_weight": 1.0,
-        "run_refine": False,
-    },
-    {
-        "name": "P1+P2+P3",
-        "gamma": 0.1,
-        "inject_graph_hint": True,
-        "bias_weight": 1.0,
-        "run_refine": True,
-        "reuse_thought_from": "P1+P3",
     },
 ]
 
@@ -173,8 +147,6 @@ def _preprocess_cmd(python_bin, dataset_name, spec, exp, exp_dir):
         str(exp["gamma"]),
         "--inject_graph_hint",
         _bool_arg(exp["inject_graph_hint"]),
-        "--bias_weight",
-        str(exp["bias_weight"]),
     ]
     return cmd, output_path
 
