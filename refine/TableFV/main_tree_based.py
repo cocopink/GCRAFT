@@ -57,6 +57,9 @@ def main(
     use_clarifier: bool = True,
     frozen_memory: bool = False,
     critic_tree_json: str = "",
+    bias_weight: float = 0.0,
+    enable_p2: bool = False,
+    enable_p6: bool = False,
 ):
     openai_api_key = _resolve_openai_api_key(openai_api_key)
 
@@ -74,6 +77,41 @@ def main(
         all_samples = read_pkl(result_pkl)[:first_n]
     else:
         all_samples = read_pkl(result_pkl)
+
+    # P3 候选偏置: bias_weight > 0 时经运行参数注入 sample 的 graph_metadata,
+    # 不绑定数据文件 (E2 中 P3 on/off 的 refine 配置可安全复用同一 thought 产物)
+    if bias_weight > 0:
+        injected = 0
+        for sample in all_samples:
+            if sample is not None:
+                metadata = sample.get("graph_metadata") or {}
+                metadata["bias_weight"] = bias_weight
+                sample["graph_metadata"] = metadata
+                injected += 1
+        print(f"[P3] bias_weight={bias_weight} injected into {injected} samples")
+
+    # P2 图提示 (refine 级开关): 复用 thought 产物时经运行参数覆写 inject_graph_hint,
+    # get_graph_hint 会从 *_relevance_scores 现算兜底 (E2 C4/C5 复用 thought 的机制)
+    if enable_p2:
+        overridden = 0
+        for sample in all_samples:
+            if sample is not None:
+                metadata = sample.get("graph_metadata") or {}
+                metadata["inject_graph_hint"] = True
+                sample["graph_metadata"] = metadata
+                overridden += 1
+        print(f"[P2] graph hint enabled (refine-level override) for {overridden} samples")
+
+    # P6 图证据核验: enable_p6 经 graph_metadata 传入通路 (controller / legacy chain 共用)
+    if enable_p6:
+        injected = 0
+        for sample in all_samples:
+            if sample is not None:
+                metadata = sample.get("graph_metadata") or {}
+                metadata["enable_p6"] = True
+                sample["graph_metadata"] = metadata
+                injected += 1
+        print(f"[P6] graph judge enabled for {injected} samples")
 
     gpt_llm = LLM(
         model_name=model_name,
@@ -104,6 +142,9 @@ def main(
     print("Using controller-based refinement...")
     print(f"Clarifier enabled: {use_clarifier}")
     print(f"Frozen memory enabled: {frozen_memory}")
+    print(f"P3 bias weight: {bias_weight}")
+    print(f"P2 graph hint (refine-level): {enable_p2}")
+    print(f"P6 graph judge: {enable_p6}")
     print(f"Concurrency: n_proc={n_proc}, chunk_size={chunk_size}")
 
     llm_options = gpt_llm.get_model_options(

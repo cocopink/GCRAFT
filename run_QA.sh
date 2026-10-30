@@ -13,23 +13,35 @@ MODE="${MODE:-new}"
 # ============== TableAnalyzer Configuration ==============
 USE_TABLE_ANALYZER="true"  # Set to "false" to skip analysis stage
 
-# ============== Graph Enhancement (P1+P2) ==============
-# ============== Graph Enhancement (P1+P2) ==============
-ENABLE_P1="${ENABLE_P1:-true}"     # P1: ATGO gamma smoothing for row reranking
-ENABLE_P2="${ENABLE_P2:-true}"     # P2: inject graph hints for Refine stage
-P1_GAMMA="${P1_GAMMA:-0.1}"       # P1 gamma value (0.0 disables smoothing)
+# ============== Graph Enhancement (P1-P6, 可开关) ==============
+ENABLE_ATGO="${ENABLE_ATGO:-true}"  # ATGO: Stage 0.7 QG-PPR 行重排本体 (false=raw 表对照, 跳过 Stage 0.7)
+ENABLE_P1="${ENABLE_P1:-true}"      # P1: ATGO gamma smoothing for row reranking
+ENABLE_P2="${ENABLE_P2:-true}"      # P2: inject graph hints for Refine stage
+P1_GAMMA="${P1_GAMMA:-0.1}"         # P1 gamma value (0.0 disables smoothing)
+ENABLE_P3="${ENABLE_P3:-false}"     # P3: graph candidate bias for Refine select_row/select_column
+P3_BIAS_WEIGHT="${P3_BIAS_WEIGHT:-1.0}"  # P3 bias strength (运行参数注入, 见 docs/modules_p1_p6.md §4)
+ENABLE_P6="${ENABLE_P6:-false}"     # P6: graph-grounded judge (一期 CONFLICT/UNKNOWN, 见 docs/modules_p1_p6.md §7)
 ENABLE_ATGC="${ENABLE_ATGC:-false}" # ATGC: optional col-only rerank control experiment
+
+# Validate switch combinations
+if [ "$ENABLE_ATGO" != "true" ]; then
+    for _s in "$ENABLE_P1" "$ENABLE_P2" "$ENABLE_P3" "$ENABLE_P6"; do
+        if [ "$_s" = "true" ]; then
+            echo "❌ Error: ENABLE_ATGO=false (raw 对照) 时 P1/P2/P3/P6 不可开启 (无图数据可用)."
+            exit 1
+        fi
+    done
+fi
+if [ "$ENABLE_P3" = "true" ] && { [ "$ENABLE_P1" != "true" ] || [ "$ENABLE_P2" != "true" ]; }; then
+    echo "❌ Error: ENABLE_P3=true 需要 ENABLE_P1 与 ENABLE_P2 同时开启 (E2 最强配置叠加位, 见 docs/experiment_plan_p1_p6.md §2.2)."
+    exit 1
+fi
 
 # ============== Results Path Configuration ==============
 RESULTS_BASE="test/results"
 DATA_DIR="thought/TableQA/data/wikitq"
 ORIGINAL_DATA="${DATA_DIR}/test_lower.jsonl"
-DATASET_TO_USE="$ORIGINAL_DATA"
 
-ANALYSIS_DATA="${DATA_DIR}/test_analyzed.jsonl"
-ATG_RERANK_DATA="${DATA_DIR}/test_reranked.jsonl"
-ATGO_ROW_DATA="${DATA_DIR}/test_reranked_row.jsonl"
-ATGC_COL_DATA="${DATA_DIR}/test_reranked_col.jsonl"
 case "$MODE" in
     orig) MODE_SUFFIX="_orig" ;;
     new) MODE_SUFFIX="" ;;
@@ -37,6 +49,45 @@ case "$MODE" in
 esac
 THOUGHT_RESULTS="${RESULTS_BASE}/thought/wikitq/${model_name}${MODE_SUFFIX}"
 REFINE_RESULTS="${RESULTS_BASE}/refine/wikitq/${model_name}${MODE_SUFFIX}"
+
+# Determine rerank tag from ATGO/P1/P2/P3 combination (Stage 0.7 输出文件按配置分名, 防止串写)
+RERANK_TAG=""
+if [ "$ENABLE_ATGO" != "true" ]; then
+    RERANK_TAG="_raw"
+else
+    if [ "$ENABLE_P1" = "true" ] && [ "$ENABLE_P2" = "true" ]; then
+        RERANK_TAG="_p12"
+    elif [ "$ENABLE_P1" = "true" ]; then
+        RERANK_TAG="_p1"
+    elif [ "$ENABLE_P2" = "true" ]; then
+        RERANK_TAG="_p2"
+    fi
+    if [ "$ENABLE_P3" = "true" ]; then
+        if [ "$RERANK_TAG" = "_p12" ]; then RERANK_TAG="_p123"; else RERANK_TAG="${RERANK_TAG}_p3"; fi
+    fi
+fi
+ATGO_ROW_DATA="${DATA_DIR}/test_reranked_row${RERANK_TAG}.jsonl"
+ATGC_COL_DATA="${DATA_DIR}/test_reranked_col.jsonl"
+
+# Thought 输入: ATGO 开启走重排数据, 关闭走 raw 原始表 (refine/thought 的 table_text 回落链天然兼容)
+if [ "$ENABLE_ATGO" = "true" ]; then
+    THOUGHT_INPUT="$ATGO_ROW_DATA"
+else
+    THOUGHT_INPUT="$ORIGINAL_DATA"
+fi
+
+# Result directory suffix = rerank tag + P6 (P6 只影响 Refine, 不影响重排)
+if [ "$ENABLE_P6" = "true" ]; then
+    GRAPH_SUFFIX="${RERANK_TAG}_p6"
+else
+    GRAPH_SUFFIX="${RERANK_TAG}"
+fi
+
+# ============== Error Tree Evolution (每实验独立进化树) ==============
+# False = 进化模式: 从 canonical 播种本实验私有树并在运行内进化
+# True  = 静态树消融: 读 canonical, 永不写
+FROZEN_MEMORY="${FROZEN_MEMORY:-False}"
+EVOLVE_TREE_JSON="${REFINE_RESULTS}${GRAPH_SUFFIX}/memory/few_shot_critic.json"
 
 # ============== Logging Setup ==============
 LOG_DIR="logs"
@@ -57,39 +108,22 @@ n_proc             = ${n_proc}
 chunk_size         = ${chunk_size}
 MODE               = ${MODE}
 USE_TABLE_ANALYZER = ${USE_TABLE_ANALYZER}
+ENABLE_ATGO        = ${ENABLE_ATGO}
 ENABLE_P1          = ${ENABLE_P1} (gamma=${P1_GAMMA})
 ENABLE_P2          = ${ENABLE_P2}
+ENABLE_P3          = ${ENABLE_P3} (bias_weight=${P3_BIAS_WEIGHT})
+ENABLE_P6          = ${ENABLE_P6}
+ENABLE_ATGC        = ${ENABLE_ATGC}
 GRAPH_SUFFIX       = ${GRAPH_SUFFIX}
 RESULTS_BASE       = ${RESULTS_BASE}
 ORIGINAL_DATA      = ${ORIGINAL_DATA}
-ATG_RERANK_DATA    = ${ATG_RERANK_DATA}
+THOUGHT_INPUT      = ${THOUGHT_INPUT}
 ATGO_ROW_DATA      = ${ATGO_ROW_DATA}
 ATGC_COL_DATA      = ${ATGC_COL_DATA}
 THOUGHT_RESULTS    = ${THOUGHT_RESULTS}
 REFINE_RESULTS     = ${REFINE_RESULTS}
 ========================================
 EOF
-
-# Validate P1/P2 combination: only both-on or both-off are allowed
-if [ "$ENABLE_P1" != "$ENABLE_P2" ]; then
-    echo "❌ Error: ENABLE_P1 and ENABLE_P2 must be both true or both false."
-    echo "   Partial combinations (P1-only or P2-only) are not supported."
-    echo "   See docs/graph_experiment_analysis_report.md for experiment details."
-    exit 1
-fi
-
-# Determine result directory suffix based on P1/P2 state
-if [ "$ENABLE_P1" = "true" ]; then
-    GRAPH_SUFFIX="_p12"
-else
-    GRAPH_SUFFIX=""
-fi
-
-# ============== Error Tree Evolution (每实验独立进化树) ==============
-# False = 进化模式: 从 canonical 播种本实验私有树并在运行内进化
-# True  = 静态树消融: 读 canonical, 永不写
-FROZEN_MEMORY="${FROZEN_MEMORY:-False}"
-EVOLVE_TREE_JSON="${REFINE_RESULTS}${GRAPH_SUFFIX}/memory/few_shot_critic.json"
 
 echo "📝 Log: ${LOG_FILE}"
 
@@ -100,25 +134,30 @@ echo "=========================================="
 echo "📊 Running TableQA Pipeline (ATG + QG-PPR)"
 echo "=========================================="
 
-# ============== Stage 0.7a: ATGO Row-only Reranking (P1+P2) ==============
-if [ ! -f "$ATGO_ROW_DATA" ] || [ "$ATGO_ROW_DATA" -ot "$ORIGINAL_DATA" ]; then
-    echo ""
-    echo "Stage 0.7a: ATGO Row-only Reranking (P1=${ENABLE_P1}, P2=${ENABLE_P2})"
-    echo "------------------------------------------"
-    python preprocess_atgo.py \
-        --mode row \
-        --dataset_path "$ORIGINAL_DATA" \
-        --output_path "$ATGO_ROW_DATA" \
-        --gamma $([ "$ENABLE_P1" = "true" ] && echo "$P1_GAMMA" || echo "0.0") \
-        --inject_graph_hint $([ "$ENABLE_P2" = "true" ] && echo "True" || echo "False")
+# ============== Stage 0.7a: ATGO Row-only Reranking (P1+P2+P3) ==============
+if [ "$ENABLE_ATGO" = "true" ]; then
+    if [ ! -f "$ATGO_ROW_DATA" ] || [ "$ATGO_ROW_DATA" -ot "$ORIGINAL_DATA" ]; then
+        echo ""
+        echo "Stage 0.7a: ATGO Row-only Reranking (P1=${ENABLE_P1}, P2=${ENABLE_P2}, P3=${ENABLE_P3})"
+        echo "------------------------------------------"
+        python preprocess_atgo.py \
+            --mode row \
+            --dataset_path "$ORIGINAL_DATA" \
+            --output_path "$ATGO_ROW_DATA" \
+            --gamma $([ "$ENABLE_P1" = "true" ] && echo "$P1_GAMMA" || echo "0.0") \
+            --inject_graph_hint $([ "$ENABLE_P2" = "true" ] && echo "True" || echo "False") \
+            --bias_weight $([ "$ENABLE_P3" = "true" ] && echo "$P3_BIAS_WEIGHT" || echo "0.0")
 
-    if [ $? -ne 0 ]; then
-        echo "❌ Error in ATGO row-only reranking stage"
-        exit 1
+        if [ $? -ne 0 ]; then
+            echo "❌ Error in ATGO row-only reranking stage"
+            exit 1
+        fi
+        echo "✅ ATGO row-only reranking complete!"
+    else
+        echo "✅ Using existing ATGO row-only reranking: $ATGO_ROW_DATA"
     fi
-    echo "✅ ATGO row-only reranking complete!"
 else
-    echo "✅ Using existing ATGO row-only reranking: $ATGO_ROW_DATA"
+    echo "ℹ️ ENABLE_ATGO=false: raw 对照模式, 跳过 Stage 0.7 (Thought 输入 = $ORIGINAL_DATA)"
 fi
 
 # ============== Stage 1-ATGO: Thought (Row-only, P1+P2) ==============
@@ -126,7 +165,7 @@ echo ""
 echo "Stage 1-ATGO: Thought (Row-only)"
 echo "------------------------------------------"
 python thought/TableQA/main.py \
---dataset_path "$ATGO_ROW_DATA" \
+--dataset_path "$THOUGHT_INPUT" \
 --thought_results_dir "${THOUGHT_RESULTS}${GRAPH_SUFFIX}" \
 --base_url $base_url \
 --openai_api_key $openai_api_key \
@@ -140,7 +179,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# ============== Stage 2: Refine (P1+P2, Controller-driven) ==============
+# ============== Stage 2: Refine (P1+P2+P3+P6, Controller-driven) ==============
 echo ""
 echo "Stage 2: Refine (Controller-driven)"
 echo "------------------------------------------"
@@ -160,6 +199,8 @@ python refine/TableQA/main_tree_based.py \
 --chunk_size $chunk_size \
 --use_clarifier $([ "$MODE" = "new" ] && echo "True" || echo "False") \
 --frozen_memory $FROZEN_MEMORY \
+--bias_weight $([ "$ENABLE_P3" = "true" ] && echo "$P3_BIAS_WEIGHT" || echo "0.0") \
+--enable_p6 $([ "$ENABLE_P6" = "true" ] && echo "True" || echo "False") \
 $EVOLVE_ARGS
 
 if [ $? -ne 0 ]; then

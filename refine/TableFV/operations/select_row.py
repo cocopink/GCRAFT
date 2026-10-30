@@ -3,6 +3,7 @@ import re
 import numpy as np
 from utils.helper import table2string
 from table_structure.context import get_graph_hint
+from table_structure.graph_bias import apply_graph_bias
 
 from third_party.select_column_row_prompts.select_column_row_prompts import select_row_demo
 
@@ -55,6 +56,14 @@ def select_row_func(sample, table_info, llm, llm_options=None, debug=False, crit
         pred_conf_dict[pred] += np.exp(score)
 
     select_row_rank = sorted(pred_conf_dict.items(), key=lambda x: x[1], reverse=True)
+    # P3 候选偏置: 按 graph_metadata.bias_weight 对图分数重排候选 (0.0 时为纯置信度排序, 行为不变)
+    bias_weight = sample.get("graph_metadata", {}).get("bias_weight", sample.get("_bias_weight", 0.0))
+    select_row_rank = apply_graph_bias(
+        select_row_rank,
+        sample.get("row_relevance_scores", sample.get("_row_relevance_scores", {})),
+        bias_weight,
+        "row",
+    )
 
     thought = "Select relevant rows.\n" + responses[0][0].split("Answer:")[0].strip() if "Answer:" in responses[0][0] else responses[0][0].strip() + "\n"
     

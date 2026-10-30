@@ -17,6 +17,7 @@ import multiprocessing as mp
 from operations import *
 
 from tools import critic_exec_one_sample, judge_exec_one_sample, tree_exec_one_sample, update_error_tree
+from utils.graph_judge import override_judge_if_conflict  # P6 图证据核验 (legacy 通路)
 
 
 def fixed_chain_exec_mp(llm, init_samples, n_proc=10, chunk_size=50):
@@ -984,6 +985,8 @@ def _judge_critic_refine_with_cache_mp_core(arg):
         else:
             current_stage = "judge_execution"
             judge_sample = judge_exec_one_sample(sample, llm=llm, llm_options=llm_options)
+            # [P6] 图核验记录 + CONFLICT 覆盖 (Correct 判定时改写 judge → 走 critic 通路)
+            override_judge_if_conflict(judge_sample)
             judge = judge_sample['judge']
             judge = judge.strip('*')
             judge = judge.strip()
@@ -1043,6 +1046,8 @@ def _judge_critic_refine_with_cache_mp_core(arg):
                         loop_count += 1
                         current_stage = f"loop_{loop_count}_judge_after_refine"
                         judge_sample = judge_exec_one_sample(refine_sample, llm=llm, llm_options=llm_options)
+                        # [P6] 图核验 + CONFLICT 覆盖 (此处判定口径为 == '[Correct]')
+                        override_judge_if_conflict(judge_sample)
                         judge = judge_sample['judge'].strip()
                         proc_sample = judge_sample
                         

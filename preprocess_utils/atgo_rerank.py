@@ -54,8 +54,12 @@ def _cache_path(cache_dir: str, sample_id: str, metadata: Dict) -> str:
         f"{sample_id}.schema-{metadata['schema_version']}"
         f".mode-{metadata['rerank_mode']}"
         f".gamma-{metadata['gamma']}"
-        f".hint-{int(metadata['inject_graph_hint'])}.pkl"
+        f".hint-{int(metadata['inject_graph_hint'])}"
     )
+    # bias 段仅在 P3 开启 (bias_weight > 0) 时附加, bias=0 保持与既有缓存名兼容
+    if metadata.get("bias_weight", 0.0) > 0:
+        name += f".bias-{metadata['bias_weight']}"
+    name += ".pkl"
     return os.path.join(cache_dir, name)
 
 
@@ -76,10 +80,12 @@ class ATGOReranker:
         cache_dir: Optional[str] = None,
         gamma: float = 0.0,
         inject_graph_hint: bool = False,
+        bias_weight: float = 0.0,
     ):
         self.cache_dir = cache_dir
         self.gamma = gamma
         self.inject_graph_hint = inject_graph_hint
+        self.bias_weight = bias_weight
 
     def _metadata(self) -> Dict:
         return {
@@ -87,6 +93,7 @@ class ATGOReranker:
             "rerank_mode": "row",
             "gamma": self.gamma,
             "inject_graph_hint": self.inject_graph_hint,
+            "bias_weight": self.bias_weight,
         }
 
     def _load_cache(self, sample: Dict, cache_path: str) -> bool:
@@ -197,10 +204,12 @@ class ATGCReranker:
         cache_dir: Optional[str] = None,
         gamma: float = 0.0,
         inject_graph_hint: bool = False,
+        bias_weight: float = 0.0,
     ):
         self.cache_dir = cache_dir
         self.gamma = gamma
         self.inject_graph_hint = inject_graph_hint
+        self.bias_weight = bias_weight
 
     def _metadata(self) -> Dict:
         return {
@@ -208,6 +217,7 @@ class ATGCReranker:
             "rerank_mode": "col",
             "gamma": self.gamma,
             "inject_graph_hint": self.inject_graph_hint,
+            "bias_weight": self.bias_weight,
         }
 
     def _load_cache(self, sample: Dict, cache_path: str) -> bool:

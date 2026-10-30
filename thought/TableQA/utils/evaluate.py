@@ -382,7 +382,7 @@ def wikitq_match_func_for_samples(all_samples, strategy="top", tagged_dataset_pa
             continue
         filename = os.path.join(tagged_dataset_path, filename)
         # print('Reading dataset from', filename)
-        with open(filename, 'r', 'utf8') as fin:
+        with open(filename, 'r', encoding='utf8') as fin:
             header = fin.readline().rstrip('\n').split('\t')
             for line in fin:
                 stuff = dict(zip(header, line.rstrip('\n').split('\t')))

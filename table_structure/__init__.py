@@ -38,6 +38,7 @@ from table_structure.column_similarity import ColumnSimilarityComputer
 from table_structure.column_smoothing import build_smoothed_propagation_matrix
 from table_structure.context import build_relevance_context
 from table_structure.candidate import canonicalize_candidate, parse_column_candidate
+from table_structure.graph_bias import apply_graph_bias, parse_column_candidate, parse_row_candidate
 from table_structure.serializer import rerank_table, rerank_table_to_text
 
 __all__ = [
@@ -62,6 +63,8 @@ __all__ = [
     "build_relevance_context",
     "canonicalize_candidate",
     "parse_column_candidate",
+    "apply_graph_bias",
+    "parse_row_candidate",
     # 序列化
     "rerank_table",
     "rerank_table_to_text",

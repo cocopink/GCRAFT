@@ -31,6 +31,9 @@ DEBUG = True
 # 统一的错误树 JSON 路径
 CRITIC_TREE_JSON = "critic/TableQA/tools/few_shot_critic.json"
 
+# P6 图证据核验 (开关经 sample["graph_metadata"]["enable_p6"] 传入)
+from utils.graph_judge import override_judge_if_conflict
+
 
 # ==================== 1. ControllerState 数据类 ====================
 
@@ -1278,7 +1281,10 @@ def controller_main_loop(
         llm=llm,
         llm_options=llm_options
     )
-    
+
+    # [P6] 图核验记录 + CONFLICT 覆盖 (Correct 判定时改写 judge → 纠错通路接管)
+    p6_overridden = override_judge_if_conflict(judge_sample)
+
     # 初始化状态，使用 Judge 的判断结果
     state = ControllerState(
         sample=judge_sample,
@@ -1287,11 +1293,11 @@ def controller_main_loop(
         conclusion=judge_sample.get("judge", "[Incorrect]")
         # conclusion="[Incorrect]"
     )
-    
+
     # 如果初始状态已经正确，直接返回
     if state.is_correct:
-        # Record routing info
-        judge_sample["_route"] = "SKIP"
+        # Record routing info (P6 CONFLICT 覆盖时不会走到这里: judge 已被改写)
+        judge_sample["_route"] = "FULL_P6" if p6_overridden else "SKIP"
         # 缓存正确的结果
         if cache_dir is not None:
             try:
@@ -1453,6 +1459,9 @@ def controller_main_loop(
                 llm_options=llm_options
             )
             state.sample = judge_sample
+            # [P6] 图核验记录 + CONFLICT 覆盖 (refine 后判 Correct 仍可能被图证据推翻)
+            if override_judge_if_conflict(judge_sample) and DEBUG:
+                print(f">>> P6 CONFLICT override after refine")
             state.conclusion = judge_sample.get("judge", "[Incorrect]")
             
             # 调试打印
