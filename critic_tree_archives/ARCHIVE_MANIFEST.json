@@ -1,5 +1,5 @@
 {
-  "archived_at": "2026-11-03 16:00:16",
+  "archived_at": "2026-11-03 21:45:59",
   "trees": [
     {
       "batch": "canonical_baseline",
@@ -261,6 +261,42 @@
       "size_bytes": 46200,
       "sha256": "14d2a1faad5a455154277d130a7c55a09268ca5e74c89d4348e740fe61b38b83",
       "mtime": "2026-11-03 15:16:19"
+    },
+    {
+      "batch": "boost_R1",
+      "label": "R1/tabfact 运行后进化树",
+      "original_path": "results/boost/R1/tree_tabfact.json",
+      "archived_path": "critic_tree_archives/boost/R1_tabfact_evolved.json",
+      "size_bytes": 133371,
+      "sha256": "a4360ba7cfbca700ff537e9010e8f24c1f1e3092e4f813e67f17489e39ef1a1d",
+      "mtime": "2026-11-03 18:42:43"
+    },
+    {
+      "batch": "boost_R2",
+      "label": "R2/tabfact 运行后进化树",
+      "original_path": "results/boost/R2/tree_tabfact_seeded.json",
+      "archived_path": "critic_tree_archives/boost/R2_tabfact_evolved.json",
+      "size_bytes": 296461,
+      "sha256": "cb2385432c5e565cb1e0840228dc6ac9e5c5ea3574b083d3d61e192c52de264f",
+      "mtime": "2026-11-03 18:04:16"
+    },
+    {
+      "batch": "boost_R1",
+      "label": "R1/wikitq 运行后进化树",
+      "original_path": "results/boost/R1/tree_wikitq.json",
+      "archived_path": "critic_tree_archives/boost/R1_wikitq_evolved.json",
+      "size_bytes": 198255,
+      "sha256": "741274ceda1837890cb29b8016ad073e3fe48f5de3e0eb21b9c6a269c2248131",
+      "mtime": "2026-11-03 20:56:19"
+    },
+    {
+      "batch": "boost_R2",
+      "label": "R2/wikitq 运行后进化树",
+      "original_path": "results/boost/R2/tree_wikitq_seeded.json",
+      "archived_path": "critic_tree_archives/boost/R2_wikitq_evolved.json",
+      "size_bytes": 247458,
+      "sha256": "f5ed5da55d6587bc603e6c137a214a72d563f126a8a2a0733d5f96722a6c735b",
+      "mtime": "2026-11-03 21:27:10"
     }
   ]
 }
