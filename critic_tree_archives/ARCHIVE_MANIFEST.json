@@ -1,0 +1,266 @@
+{
+  "archived_at": "2026-11-03 16:00:16",
+  "trees": [
+    {
+      "batch": "canonical_baseline",
+      "label": "wikitq canonical (播种源)",
+      "original_path": "critic/TableQA/tools/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/canonical_baseline/wikitq.json",
+      "size_bytes": 180368,
+      "sha256": "859be40613a2d1ed022183c9a7ee6a82abb5111e8e2c0e07890f9202167a59bc",
+      "mtime": "2026-10-19 18:32:30"
+    },
+    {
+      "batch": "canonical_baseline",
+      "label": "tabfact canonical (播种源)",
+      "original_path": "critic/TableFV/tools/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/canonical_baseline/tabfact.json",
+      "size_bytes": 46200,
+      "sha256": "14d2a1faad5a455154277d130a7c55a09268ca5e74c89d4348e740fe61b38b83",
+      "mtime": "2026-09-21 16:44:14"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "tabfact/C1_raw",
+      "original_path": "results/graph_experiments/tabfact/C1_raw/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/tabfact_C1_raw.json",
+      "size_bytes": 106195,
+      "sha256": "13caf11637ac68eeb10d8b12d4e25200abe47959ea92a418639cef7603ab1242",
+      "mtime": "2026-10-31 12:43:29"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "tabfact/C2_atgo",
+      "original_path": "results/graph_experiments/tabfact/C2_atgo/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/tabfact_C2_atgo.json",
+      "size_bytes": 46200,
+      "sha256": "14d2a1faad5a455154277d130a7c55a09268ca5e74c89d4348e740fe61b38b83",
+      "mtime": "2026-10-31 14:08:28"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "tabfact/C3_p1",
+      "original_path": "results/graph_experiments/tabfact/C3_p1/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/tabfact_C3_p1.json",
+      "size_bytes": 62078,
+      "sha256": "fcfe0240dd27558846484d86198c13473e39189f5333db50391f9c33d020f9d4",
+      "mtime": "2026-10-31 15:34:13"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "tabfact/C4_p2",
+      "original_path": "results/graph_experiments/tabfact/C4_p2/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/tabfact_C4_p2.json",
+      "size_bytes": 49039,
+      "sha256": "811a1ba939349af388aad5a4c654f34a1f1bcfcfdac8d98fce2f591e98edd4b9",
+      "mtime": "2026-10-31 15:55:48"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "tabfact/C5_p1p2",
+      "original_path": "results/graph_experiments/tabfact/C5_p1p2/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/tabfact_C5_p1p2.json",
+      "size_bytes": 62548,
+      "sha256": "e1a7a084b87012951f00bf8b30a0b68cd5e1b8d219f5c78ebc68709b0e60f0ea",
+      "mtime": "2026-10-31 16:18:55"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "tabfact/C6_p1p2p3",
+      "original_path": "results/graph_experiments/tabfact/C6_p1p2p3/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/tabfact_C6_p1p2p3.json",
+      "size_bytes": 50453,
+      "sha256": "17cc5234b24b992f230ba137be953343acf1c04361b874a1e45e9de407c736b0",
+      "mtime": "2026-10-31 16:41:14"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "wikitq/C1_raw",
+      "original_path": "results/graph_experiments/wikitq/C1_raw/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/wikitq_C1_raw.json",
+      "size_bytes": 216293,
+      "sha256": "39c30e777ea29313ab6a206b15162ad7c65c4b465d2a377b03e2b38ed161ae6c",
+      "mtime": "2026-10-31 20:50:00"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "wikitq/C2_atgo",
+      "original_path": "results/graph_experiments/wikitq/C2_atgo/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/wikitq_C2_atgo.json",
+      "size_bytes": 215378,
+      "sha256": "f3c90ee2f0a59a310a12b975fc0066d6c3f1e00efb66c9b1556c1982fa2b39b0",
+      "mtime": "2026-11-01 01:15:47"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "wikitq/C3_p1",
+      "original_path": "results/graph_experiments/wikitq/C3_p1/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/wikitq_C3_p1.json",
+      "size_bytes": 255239,
+      "sha256": "e3a4705dc26c7c2bcbfba27b7c41b466dba8fdbb790cdeb1f09bb2127815667f",
+      "mtime": "2026-11-01 05:53:12"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "wikitq/C4_p2",
+      "original_path": "results/graph_experiments/wikitq/C4_p2/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/wikitq_C4_p2.json",
+      "size_bytes": 228898,
+      "sha256": "3b73a53954875efcc4c0d8eedb650d03c67ba35e558e03d1ff8092fae3079d9e",
+      "mtime": "2026-11-01 07:30:16"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "wikitq/C5_p1p2",
+      "original_path": "results/graph_experiments/wikitq/C5_p1p2/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/wikitq_C5_p1p2.json",
+      "size_bytes": 180368,
+      "sha256": "859be40613a2d1ed022183c9a7ee6a82abb5111e8e2c0e07890f9202167a59bc",
+      "mtime": "2026-11-01 09:07:22"
+    },
+    {
+      "batch": "e2_rep1",
+      "label": "wikitq/C6_p1p2p3",
+      "original_path": "results/graph_experiments/wikitq/C6_p1p2p3/refine/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/e2_rep1/wikitq_C6_p1p2p3.json",
+      "size_bytes": 256061,
+      "sha256": "9c2f12e925a51f2186a6b2126153298ccaf8c221f599652fcb82b5ccaa31d2db",
+      "mtime": "2026-11-01 10:47:04"
+    },
+    {
+      "batch": "e7_p6",
+      "label": "tabfact/p6off",
+      "original_path": "results/e7_judgewrong/tree_tabfact_p6off.json",
+      "archived_path": "critic_tree_archives/e7_p6/tabfact_p6off.json",
+      "size_bytes": 46200,
+      "sha256": "14d2a1faad5a455154277d130a7c55a09268ca5e74c89d4348e740fe61b38b83",
+      "mtime": "2026-11-01 12:03:48"
+    },
+    {
+      "batch": "e7_p6",
+      "label": "tabfact/p6on",
+      "original_path": "results/e7_judgewrong/tree_tabfact_p6on.json",
+      "archived_path": "critic_tree_archives/e7_p6/tabfact_p6on.json",
+      "size_bytes": 77571,
+      "sha256": "8d716550d61666741082167563a8d2eace097e1afc1fb91b5d78b0e9a4373ced",
+      "mtime": "2026-11-01 12:14:42"
+    },
+    {
+      "batch": "e7_p6",
+      "label": "wikitq/p6off",
+      "original_path": "results/e7_judgewrong/tree_wikitq_p6off.json",
+      "archived_path": "critic_tree_archives/e7_p6/wikitq_p6off.json",
+      "size_bytes": 180368,
+      "sha256": "859be40613a2d1ed022183c9a7ee6a82abb5111e8e2c0e07890f9202167a59bc",
+      "mtime": "2026-11-01 12:28:29"
+    },
+    {
+      "batch": "e7_p6",
+      "label": "wikitq/p6on",
+      "original_path": "results/e7_judgewrong/tree_wikitq_p6on.json",
+      "archived_path": "critic_tree_archives/e7_p6/wikitq_p6on.json",
+      "size_bytes": 204049,
+      "sha256": "29c9e701328b009e3f02e508996b6283edf79d73cd3cc699d1a52bf6f3e7487b",
+      "mtime": "2026-11-01 12:44:42"
+    },
+    {
+      "batch": "p5_critic_baseline",
+      "label": "tabfact",
+      "original_path": "results/p5_injection/critic_tree_tabfact.json",
+      "archived_path": "critic_tree_archives/p5_critic_baseline/tabfact.json",
+      "size_bytes": 46200,
+      "sha256": "14d2a1faad5a455154277d130a7c55a09268ca5e74c89d4348e740fe61b38b83",
+      "mtime": "2026-11-01 11:33:20"
+    },
+    {
+      "batch": "p5_critic_baseline",
+      "label": "wikitq",
+      "original_path": "results/p5_injection/critic_tree_wikitq.json",
+      "archived_path": "critic_tree_archives/p5_critic_baseline/wikitq.json",
+      "size_bytes": 190729,
+      "sha256": "ad474f822cb09066979f22868c0d115885ff3ec258430288e0e4fbb0540849ce",
+      "mtime": "2026-11-01 11:42:19"
+    },
+    {
+      "batch": "len32k_p12",
+      "label": "tabfact/0.8b",
+      "original_path": "test/results_len32k/refine/tabfact/qwen3.5-0.8b_p12/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/len32k_p12/tabfact_0.8b.json",
+      "size_bytes": 60944,
+      "sha256": "d7e5c08dd62d77b211389c5b547b0684f5bfd808929bef768c388045f181abf0",
+      "mtime": "2026-10-19 21:26:49"
+    },
+    {
+      "batch": "len32k_p12",
+      "label": "tabfact/2b",
+      "original_path": "test/results_len32k/refine/tabfact/qwen3.5-2b_p12/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/len32k_p12/tabfact_2b.json",
+      "size_bytes": 46200,
+      "sha256": "14d2a1faad5a455154277d130a7c55a09268ca5e74c89d4348e740fe61b38b83",
+      "mtime": "2026-10-19 23:25:24"
+    },
+    {
+      "batch": "len32k_p12",
+      "label": "tabfact/4b",
+      "original_path": "test/results_len32k/refine/tabfact/qwen3.5-4b_p12/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/len32k_p12/tabfact_4b.json",
+      "size_bytes": 54485,
+      "sha256": "8d295de83041e39d20dd72d0e1a7da87255639ca2a50108c6f0da6abce773ae5",
+      "mtime": "2026-10-20 01:51:03"
+    },
+    {
+      "batch": "len32k_p12",
+      "label": "tabfact/9b",
+      "original_path": "test/results_len32k/refine/tabfact/qwen3.5-9b_p12/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/len32k_p12/tabfact_9b.json",
+      "size_bytes": 46200,
+      "sha256": "14d2a1faad5a455154277d130a7c55a09268ca5e74c89d4348e740fe61b38b83",
+      "mtime": "2026-10-20 05:38:39"
+    },
+    {
+      "batch": "len32k_p12",
+      "label": "wikitq/0.8b",
+      "original_path": "test/results_len32k/refine/wikitq/qwen3.5-0.8b_p12/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/len32k_p12/wikitq_0.8b.json",
+      "size_bytes": 180368,
+      "sha256": "859be40613a2d1ed022183c9a7ee6a82abb5111e8e2c0e07890f9202167a59bc",
+      "mtime": "2026-10-19 21:06:07"
+    },
+    {
+      "batch": "len32k_p12",
+      "label": "wikitq/2b",
+      "original_path": "test/results_len32k/refine/wikitq/qwen3.5-2b_p12/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/len32k_p12/wikitq_2b.json",
+      "size_bytes": 195142,
+      "sha256": "b3e8508de5ec4f25d953bf384ff7cd1b340e7486b556cff610c64f1e25f3742e",
+      "mtime": "2026-10-19 22:51:02"
+    },
+    {
+      "batch": "len32k_p12",
+      "label": "wikitq/4b",
+      "original_path": "test/results_len32k/refine/wikitq/qwen3.5-4b_p12/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/len32k_p12/wikitq_4b.json",
+      "size_bytes": 184799,
+      "sha256": "44717921fcbfd662e70f5a7fc31df93684b8e6d6a1372c2f83ed246fa6a53966",
+      "mtime": "2026-10-20 01:14:53"
+    },
+    {
+      "batch": "len32k_p12",
+      "label": "wikitq/9b",
+      "original_path": "test/results_len32k/refine/wikitq/qwen3.5-9b_p12/memory/few_shot_critic.json",
+      "archived_path": "critic_tree_archives/len32k_p12/wikitq_9b.json",
+      "size_bytes": 180368,
+      "sha256": "859be40613a2d1ed022183c9a7ee6a82abb5111e8e2c0e07890f9202167a59bc",
+      "mtime": "2026-10-20 04:44:36"
+    },
+    {
+      "batch": "boost",
+      "label": "R1/tabfact 预播种",
+      "original_path": "results/boost/R1/tree_tabfact.json",
+      "archived_path": "critic_tree_archives/boost/R1_tabfact_presolve.json",
+      "size_bytes": 46200,
+      "sha256": "14d2a1faad5a455154277d130a7c55a09268ca5e74c89d4348e740fe61b38b83",
+      "mtime": "2026-11-03 15:16:19"
+    }
+  ]
+}
