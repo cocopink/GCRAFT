@@ -15,7 +15,7 @@ cp /root/code/GCRAFT/critic_tree_archives/canonical_baseline/tabfact.json $PKGRO
 
 # ---- 2. GCRAFT 精简 (thought 管线 + boost_thought 产物 + 文档) ----
 rsync -a --exclude '.git' --exclude '__pycache__' \
-      --exclude 'results' --exclude 'test' --exclude 'logs' --exclude 'dist' \
+      --exclude 'results' --exclude 'test' --exclude 'test.tar.gz' --exclude 'results_v2' --exclude 'logs' --exclude 'dist' \
       --exclude 'critic_tree_archives' --exclude 'nohup.out' \
       /root/code/GCRAFT/ $PKGROOT/GCRAFT/
 # 补 G thought 产物 (2B×2 已完成 + 9B tabfact 已完成; 9B wikitq 远程补)
