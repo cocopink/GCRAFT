@@ -11,13 +11,13 @@
 # 用法:
 #   bash scripts/run_atgo_axis_ablation.sh                 # QA + FV 全部 6 组
 #   DATASETS="qa" bash scripts/run_atgo_axis_ablation.sh   # 仅 QA
-#   GROUPS="col rowcol" bash scripts/run_atgo_axis_ablation.sh # 指定组(默认 col rowcol row)
+#   AXIS_GROUPS="col rowcol" bash scripts/run_atgo_axis_ablation.sh # 指定组(默认 col rowcol row)
 #   AUTO_VLLM_SERVER=false bash scripts/run_atgo_axis_ablation.sh  # 服务已手动启动
 #
 # 可调环境变量:
 #   VLLM_MODEL=/root/autodl-tmp/models/Qwen3.5-4B  SERVED_NAME=qwen3.5-4b
 #   VLLM_MAX_MODEL_LEN=32768  N_PROC=24  CHUNK_SIZE=4
-#   DATASETS="qa fv"  GROUPS="row col rowcol"
+#   DATASETS="qa fv"  AXIS_GROUPS="row col rowcol"
 
 set -u
 
@@ -45,7 +45,7 @@ use_clarifier=True   # 与 C1_raw 对照同口径 (raw+Clarifier)
 
 DATASETS="${DATASETS:-qa fv}"
 # 运行顺序: 列重排 → 行列重排 → 行重排 (实验优先级由用户指定)
-GROUPS="${GROUPS:-col rowcol row}"
+AXIS_GROUPS="${AXIS_GROUPS:-col rowcol row}"
 
 # ============== Ablation Data Configuration (P1/P2/P3 全关) ==============
 # 输出文件名匹配 .gitignore 的 test_reranked*; 缓存目录匹配 *_rerank_cache/
@@ -53,7 +53,7 @@ GROUPS="${GROUPS:-col rowcol row}"
 DATA_ARGS="--gamma 0.0 --inject_graph_hint False --bias_weight 0.0"
 
 declare -A DATA_FILES QA_DIRS FV_DIRS
-for g in $GROUPS; do
+for g in $AXIS_GROUPS; do
     DATA_FILES[$g]="test_reranked_${g}_nograph.jsonl"
     QA_DIRS[$g]="test/results/thought/wikitq/${model_name}_axis_${g}"
     FV_DIRS[$g]="test/results/thought/tabfact/${model_name}_axis_${g}"
@@ -78,7 +78,7 @@ n_proc             = ${n_proc}
 chunk_size         = ${chunk_size}
 use_clarifier      = ${use_clarifier}
 DATASETS           = ${DATASETS}
-GROUPS             = ${GROUPS}
+AXIS_GROUPS             = ${AXIS_GROUPS}
 rerank_args        = ${DATA_ARGS}
 ========================================
 EOF
@@ -156,7 +156,7 @@ declare -A DS_RAW=( [qa]="thought/TableQA/data/wikitq/test_lower.jsonl" [fv]="th
 
 for ds in $DATASETS; do
     raw="${DS_RAW[$ds]}"
-    for g in $GROUPS; do
+    for g in $AXIS_GROUPS; do
         out="thought/$( [ "$ds" = qa ] && echo TableQA/data/wikitq || echo TableFV/data/tabfact )/${DATA_FILES[$g]}"
         cache="thought/$( [ "$ds" = qa ] && echo TableQA/data/wikitq || echo TableFV/data/tabfact )/atgo_axis_ablation_rerank_cache/${g}"
         if [ -f "$out" ]; then
@@ -182,7 +182,7 @@ done
 # ============== Stage 1: Thought × {数据集} × {组} ==============
 for ds in $DATASETS; do
     tdir="${DS_TASK[$ds]}"
-    for g in $GROUPS; do
+    for g in $AXIS_GROUPS; do
         input="thought/$( [ "$ds" = qa ] && echo TableQA/data/wikitq || echo TableFV/data/tabfact )/${DATA_FILES[$g]}"
         results_dir=$( [ "$ds" = qa ] && echo "${QA_DIRS[$g]}" || echo "${FV_DIRS[$g]}" )
         echo ""
@@ -227,7 +227,7 @@ for ds in $DATASETS; do
     b_acc=$(grep -oP 'Accuracy: \K[0-9.]+' "${baseline}/acc.txt" 2>/dev/null || echo "N/A")
     echo "[$label]"
     echo "  raw (C1_raw baseline): ${b_acc}"
-    for g in $GROUPS; do
+    for g in $AXIS_GROUPS; do
         results_dir=$( [ "$ds" = qa ] && echo "${QA_DIRS[$g]}" || echo "${FV_DIRS[$g]}" )
         acc=$(grep -oP 'Accuracy: \K[0-9.]+' "${results_dir}/acc.txt" 2>/dev/null || echo "N/A")
         echo "  ${g} : ${acc}"
