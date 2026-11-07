@@ -7,8 +7,11 @@
     # 仅列排
     python preprocess_atgo.py --mode col --dataset_path input.jsonl --output_path output_col.jsonl
 
+    # 行+列联合
+    python preprocess_atgo.py --mode rowcol --dataset_path input.jsonl --output_path output_rc.jsonl
+
 输出:
-    - output.jsonl: 完整数据集，每个样本新增 atgo/atgc_reranked_table 字段
+    - output.jsonl: 完整数据集，每个样本新增 atgo/atgc/atgrc_reranked_table 字段
     - output_changed.jsonl: 仅含顺序改变的样本
 """
 
@@ -16,7 +19,7 @@ import json
 import os
 
 import fire
-from preprocess_utils.atgo_rerank import ATGOReranker, ATGCReranker
+from preprocess_utils.atgo_rerank import ATGOReranker, ATGCReranker, ATGRowColReranker
 
 
 def main(
@@ -33,14 +36,14 @@ def main(
     Args:
         dataset_path: 输入 JSONL 文件路径。
         output_path: 输出 JSONL 文件路径。
-        mode: 重排模式, "row" (仅行排) 或 "col" (仅列排)。
+        mode: 重排模式, "row" (仅行排) / "col" (仅列排) / "rowcol" (行+列联合)。
         cache_dir: 可选的逐样本 pkl 缓存目录。
         gamma: P1 列间平滑强度, 0.0 表示关闭。
         inject_graph_hint: 是否写入 Refine 图提示。
         bias_weight: P3 候选偏置强度, 写入 graph_metadata 供 Refine operations 消费, 0.0 表示关闭。
     """
-    if mode not in ("row", "col"):
-        raise ValueError(f"mode must be 'row' or 'col', got '{mode}'")
+    if mode not in ("row", "col", "rowcol"):
+        raise ValueError(f"mode must be 'row', 'col' or 'rowcol', got '{mode}'")
 
     # 加载数据集
     dataset = []
@@ -67,7 +70,7 @@ def main(
         table_key = "atgo_reranked_table"
         changed_key = "_atgo_order_changed"
         desc = "ATGO (row-only)"
-    else:
+    elif mode == "col":
         reranker = ATGCReranker(
             cache_dir=cache_dir,
             gamma=gamma,
@@ -77,6 +80,16 @@ def main(
         table_key = "atgc_reranked_table"
         changed_key = "_atgc_order_changed"
         desc = "ATGC (col-only)"
+    else:
+        reranker = ATGRowColReranker(
+            cache_dir=cache_dir,
+            gamma=gamma,
+            inject_graph_hint=inject_graph_hint,
+            bias_weight=bias_weight,
+        )
+        table_key = "atgrc_reranked_table"
+        changed_key = "_atgrc_order_changed"
+        desc = "ATGRC (row+col)"
 
     reranker.rerank_batch(dataset)
 
