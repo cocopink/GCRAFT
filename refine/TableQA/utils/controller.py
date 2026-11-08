@@ -1212,6 +1212,7 @@ def controller_main_loop(
     router_variant: Optional[str] = None,
     use_diff_critic: bool = False,
     diff_critic_mode: str = "diagnose_only",
+    rethink_rerank: bool = False,
 ) -> Dict[str, Any]:
     """
     Controller 主循环（兼容现有代码，支持 Clarifier）
@@ -1311,14 +1312,48 @@ def controller_main_loop(
         return judge_sample
 
     # AdaRefine Router: decide SKIP/LITE/FULL
-    if router_variant:
-        from refine.TableQA.utils.router import ROUTER_VARIANTS, RouteDecision
-        router_fn = ROUTER_VARIANTS.get(router_variant, ROUTER_VARIANTS["full"])
-        route_result = router_fn(judge_sample)
+    # [Rethink-Rerank] judge 判 incorrect 后先做一次重排表从零重推 (图增强后移):
+    # 执行在重排表 (get_table_info 回落链), 复判判卷在原表 (judge 只读 table_text)。
+    # 成功 -> RERANK_OK 直接返回; 失败 -> 丢弃重推链, 落回原 SKIP/LITE/FULL 流程
+    # (原链语义不变, 与既有修正循环互补)。重排表与原表相同 (order 未变) 时跳过, 避免 greedy 同表复现原错。
+    if rethink_rerank:
+        _reranked_table = sample.get("atg_reranked_table") or sample.get("atgo_reranked_table")
+        if _reranked_table and _reranked_table != sample.get("table_text"):
+            from refine.TableQA.utils.chain import regen_chain_from_scratch_one_sample, get_table_info
+            from refine.TableQA.operations.final_query import simple_query_cot_original
+            from critic.TableQA.tools import judge_exec_one_sample as _rethink_judge
+            try:
+                rethought = regen_chain_from_scratch_one_sample(
+                    judge_sample, llm=llm, llm_options=llm_options
+                )
+                rethought = simple_query_cot_original(
+                    rethought,
+                    get_table_info(rethought),
+                    llm,
+                    debug=DEBUG,
+                    use_demo=True,
+                    llm_options=llm_options,
+                )
+                rethought = _rethink_judge(rethought, llm=llm, llm_options=llm_options)
+                if "[Correct]" in rethought.get("judge", ""):
+                    rethought["_route"] = "RETHINK_RERANK_OK"
+                    if cache_dir is not None:
+                        try:
+                            with open(cache_path, "wb") as f:
+                                pickle.dump(rethought, f)
+                        except Exception as e:
+                            if DEBUG:
+                                print(f"[RETHINK] cache save failed: {e}")
+                    if DEBUG:
+                        print(f"[RETHINK] rerank rethinking Correct, early return")
+                    return rethought
+                if DEBUG:
+                    print(f"[RETHINK] rerank rethinking still Incorrect, fall through")
+            except Exception as e:
+                if DEBUG:
+                    print(f"[RETHINK] rerank rethinking failed: {e}, fall through")
 
-        if DEBUG:
-            print(f"[ROUTER] Decision: {route_result}")
-            print(f"[ROUTER] Signals: {route_result.signals}")
+    if router_variant:
 
         if route_result.decision == RouteDecision.SKIP:
             # Already handled above (Judge-Skip)

@@ -1160,6 +1160,7 @@ def controller_main_loop(
     thought_results_dir: Optional[str] = None,
     frozen_memory: bool = False,
     error_tree_json: str = "",
+    rethink_rerank: bool = False,
 ) -> Dict[str, Any]:
     """
     Controller 主循环（集成 Clarifier）
@@ -1256,7 +1257,48 @@ def controller_main_loop(
                 if DEBUG:
                     print(f"[CACHE] Failed to save cache: {e}")
         return judge_sample
-    
+
+    # [Rethink-Rerank] judge 判 incorrect 后先做一次重排表从零重推 (图增强后移):
+    # 执行在重排表 (get_table_info 回落链), 复判判卷在原表 (judge 只读 table_text)。
+    # 成功 -> RERANK_OK 直接返回; 失败 -> 丢弃重推链, 落回原修正循环
+    # (原链语义不变, 与既有修正循环互补)。重排表与原表相同 (order 未变) 时跳过, 避免 greedy 同表复现原错。
+    if rethink_rerank:
+        _reranked_table = sample.get("atg_reranked_table") or sample.get("atgo_reranked_table")
+        if _reranked_table and _reranked_table != sample.get("table_text"):
+            from refine.TableFV.utils.chain import regen_chain_from_scratch_one_sample, get_table_info
+            from refine.TableFV.operations.final_query import simple_query_cot_original
+            from critic.TableFV.tools import judge_exec_one_sample as _rethink_judge
+            try:
+                rethought = regen_chain_from_scratch_one_sample(
+                    judge_sample, llm=llm, llm_options=llm_options
+                )
+                rethought = simple_query_cot_original(
+                    rethought,
+                    get_table_info(rethought),
+                    llm,
+                    debug=DEBUG,
+                    use_demo=True,
+                    llm_options=llm_options,
+                )
+                rethought = _rethink_judge(rethought, llm=llm, llm_options=llm_options)
+                if "[Correct]" in rethought.get("judge", ""):
+                    rethought["_route"] = "RETHINK_RERANK_OK"
+                    if cache_dir is not None:
+                        try:
+                            with open(cache_path, "wb") as f:
+                                pickle.dump(rethought, f)
+                        except Exception as e:
+                            if DEBUG:
+                                print(f"[RETHINK] cache save failed: {e}")
+                    if DEBUG:
+                        print(f"[RETHINK] rerank rethinking Correct, early return")
+                    return rethought
+                if DEBUG:
+                    print(f"[RETHINK] rerank rethinking still Incorrect, fall through")
+            except Exception as e:
+                if DEBUG:
+                    print(f"[RETHINK] rerank rethinking failed: {e}, fall through")
+
     # 初始化组件
     # 修复1：先创建 ActionExecutor 以获取 RetrieverAgent 实例
     # 知识库路径注入：空串回退主线 canonical 树

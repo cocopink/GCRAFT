@@ -701,6 +701,120 @@ def generate_prompt_for_critic_step(
     return next_operation, parameter_prompt
 
 
+def _default_operation_parameter_dict(llm):
+    """动态链各操作的默认执行参数 (dynamic_chain_exec_one_sample 与从零重推共用)。"""
+    return {
+        "add_column": (
+            "addColumn",
+            add_column_func,
+            {},
+            llm.get_model_options(
+                temperature=0.0,
+                per_example_max_decode_steps=150,
+                per_example_top_p=1.0,
+            ),
+        ),
+        "select_row": (
+            "selectRow",
+            select_row_func,
+            {},
+            llm.get_model_options(
+                temperature=0.5,
+                per_example_max_decode_steps=150,
+                per_example_top_p=1.0,
+                n_sample=8,
+            ),
+        ),
+        "select_column": (
+            "selectColumn",
+            select_column_func,
+            {},
+            llm.get_model_options(
+                temperature=0.5,
+                per_example_max_decode_steps=150,
+                per_example_top_p=1.0,
+                n_sample=8,
+            ),
+        ),
+        "group_column": (
+            "groupColumn",
+            group_column_func,
+            dict(skip_op=[]),
+            llm.get_model_options(
+                temperature=0.0,
+                per_example_max_decode_steps=150,
+                per_example_top_p=1.0,
+            ),
+        ),
+        "sort_column": (
+            "sortColumn",
+            sort_column_func,
+            dict(skip_op=[]),
+            llm.get_model_options(
+                temperature=0.0,
+                per_example_max_decode_steps=150,
+                per_example_top_p=1.0,
+            ),
+        ),
+    }
+
+
+def regen_chain_from_scratch_one_sample(
+    sample,
+    llm,
+    llm_options=None,
+    strategy="top",
+    debug=False,
+    operation_parameter_dict=None,
+):
+    """judge-incorrect 重推: 置空链, 从零重新生成整条动态链 (不带原链上下文)。
+
+    执行表格由 get_table_info 的字段回落链决定
+    (atg_reranked_table > atgo_reranked_table > table_text),
+    主入口按 ids 合并重排表字段后, 本函数自动在重排表上推理。
+
+    在 deepcopies 上工作, 失败丢弃即可恢复原样本; 不经过
+    get_critic_table_info (无 chain 截断副作用)。
+
+    Returns:
+        带全新 chain 的样本 (未附加 simple_query, 由调用方收尾)。
+    """
+    if operation_parameter_dict is None:
+        operation_parameter_dict = _default_operation_parameter_dict(llm)
+
+    current_sample = copy.deepcopy(sample)
+    current_sample["chain"] = []
+
+    while True:
+        next_operation = generate_prompt_for_next_step(
+            current_sample,
+            llm=llm,
+            llm_options=llm_options,
+            strategy=strategy,
+            debug=debug,
+        )
+
+        if debug:
+            print(f"[regen] next_operation: {next_operation}")
+
+        if next_operation == "<END>":
+            break
+
+        param = operation_parameter_dict.get(next_operation)
+        if param is None:
+            if debug:
+                print(f"[regen] unknown operation {next_operation}, stop")
+            break
+        op_name, solver_func, kargs, op_llm_options = param
+
+        table_info = get_table_info(current_sample)
+
+        current_sample = solver_func(
+            current_sample, table_info, llm=llm, llm_options=op_llm_options, **kargs
+        )
+    return current_sample
+
+
 def dynamic_chain_exec_one_sample(
     sample,
     incorrect_step,
@@ -712,60 +826,7 @@ def dynamic_chain_exec_one_sample(
     operation_parameter_dict=None,
 ):
     if operation_parameter_dict is None:
-        operation_parameter_dict = {
-            "add_column": (
-                "addColumn",
-                add_column_func,
-                {},
-                llm.get_model_options(
-                    temperature=0.0,
-                    per_example_max_decode_steps=150,
-                    per_example_top_p=1.0,
-                ),
-            ),
-            "select_row": (
-                "selectRow",
-                select_row_func,
-                {},
-                llm.get_model_options(
-                    temperature=0.5,
-                    per_example_max_decode_steps=150,
-                    per_example_top_p=1.0,
-                    n_sample=8,
-                ),
-            ),
-            "select_column": (
-                "selectColumn",
-                select_column_func,
-                {},
-                llm.get_model_options(
-                    temperature=0.5,
-                    per_example_max_decode_steps=150,
-                    per_example_top_p=1.0,
-                    n_sample=8,
-                ),
-            ),
-            "group_column": (
-                "groupColumn",
-                group_column_func,
-                dict(skip_op=[]),
-                llm.get_model_options(
-                    temperature=0.0,
-                    per_example_max_decode_steps=150,
-                    per_example_top_p=1.0,
-                ),
-            ),
-            "sort_column": (
-                "sortColumn",
-                sort_column_func,
-                dict(skip_op=[]),
-                llm.get_model_options(
-                    temperature=0.0,
-                    per_example_max_decode_steps=150,
-                    per_example_top_p=1.0,
-                ),
-            ),
-        }
+        operation_parameter_dict = _default_operation_parameter_dict(llm)
 
     current_sample = copy.deepcopy(sample)
 

@@ -29,7 +29,7 @@ def _refine_one_sample_mp_core(arg):
     """Worker function for multiprocessing refinement of a single sample."""
     (llm, sample, sample_idx, llm_options, cache_dir,
      use_clarifier, thought_results_dir, max_iterations, frozen_memory,
-     critic_tree_json) = arg
+     critic_tree_json, rethink_rerank) = arg
     try:
         refined = controller_main_loop(
             sample, llm=llm, llm_options=llm_options,
@@ -38,6 +38,7 @@ def _refine_one_sample_mp_core(arg):
             thought_results_dir=thought_results_dir,
             frozen_memory=frozen_memory,
             error_tree_json=critic_tree_json,
+            rethink_rerank=rethink_rerank,
         )
         return sample_idx, refined
     except Exception as e:
@@ -60,6 +61,8 @@ def main(
     bias_weight: float = 0.0,
     enable_p2: bool = False,
     enable_p6: bool = False,
+    rethink_rerank: bool = False,
+    rethink_rerank_jsonl: str = "",
 ):
     openai_api_key = _resolve_openai_api_key(openai_api_key)
 
@@ -113,6 +116,33 @@ def main(
                 injected += 1
         print(f"[P6] graph judge enabled for {injected} samples")
 
+    # [Rethink-Rerank] 图增强后移: 按 ids 合并重排表至 atg_reranked_table 字段。
+    # 推理执行走 get_table_info 回落链 (重排表优先), Judge/Critic 判卷仍读原 table_text。
+    # 仅在 judge 判 incorrect 后由 controller 触发重推, thought 基线不受影响。
+    if rethink_rerank and rethink_rerank_jsonl:
+        import json
+        rerank_by_ids = {}
+        with open(rethink_rerank_jsonl, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                s = json.loads(line)
+                iid = s.get("ids")
+                if iid and s.get("atg_reranked_table"):
+                    rerank_by_ids[iid] = s["atg_reranked_table"]
+        merged = 0
+        for sample in all_samples:
+            if sample is None:
+                continue
+            tbl = rerank_by_ids.get(sample.get("ids"))
+            if tbl:
+                sample["atg_reranked_table"] = tbl
+                merged += 1
+        print(f"[Rethink-Rerank] merged reranked tables for {merged} samples from {rethink_rerank_jsonl}")
+    elif rethink_rerank:
+        print("[Rethink-Rerank] enabled but rethink_rerank_jsonl empty, no-op")
+
     gpt_llm = LLM(
         model_name=model_name,
         key=openai_api_key,
@@ -145,6 +175,7 @@ def main(
     print(f"P3 bias weight: {bias_weight}")
     print(f"P2 graph hint (refine-level): {enable_p2}")
     print(f"P6 graph judge: {enable_p6}")
+    print(f"Rethink-Rerank: {rethink_rerank} (jsonl: {rethink_rerank_jsonl or '-'})")
     print(f"Concurrency: n_proc={n_proc}, chunk_size={chunk_size}")
 
     llm_options = gpt_llm.get_model_options(
@@ -158,7 +189,7 @@ def main(
         args_list = [
             (gpt_llm, sample, idx, llm_options, cache_dir,
              use_clarifier, thought_results_dir, 2, frozen_memory,
-             critic_tree_json)
+             critic_tree_json, rethink_rerank)
             for idx, sample in enumerate(all_samples) if sample is not None
         ]
 
@@ -189,6 +220,7 @@ def main(
                 thought_results_dir=thought_results_dir,
                 frozen_memory=frozen_memory,
                 error_tree_json=critic_tree_json,
+                rethink_rerank=rethink_rerank,
             )
             refined_samples[idx] = refined_sample
 
