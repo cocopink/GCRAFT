@@ -1313,18 +1313,21 @@ def controller_main_loop(
 
     # AdaRefine Router: decide SKIP/LITE/FULL
     # [Rethink-Rerank] judge 判 incorrect 后先做一次重排表从零重推 (图增强后移):
-    # 执行在重排表 (get_table_info 回落链), 复判判卷在原表 (judge 只读 table_text)。
-    # 成功 -> RERANK_OK 直接返回; 失败 -> 丢弃重推链, 落回原 SKIP/LITE/FULL 流程
-    # (原链语义不变, 与既有修正循环互补)。重排表与原表相同 (order 未变) 时跳过, 避免 greedy 同表复现原错。
+    # ★ 表隔离: 重排表只挂载在重推副本 (_rethink_rerank_table -> atg_reranked_table),
+    #   重推失败丢弃副本, 修正循环仍在原表执行 (不受重排表泄漏拖累)。
+    # 成功 -> RERANK_OK 直接返回; 失败 -> 落回原 SKIP/LITE/FULL 流程。
+    # 重排表与原表相同 (order 未变) 时跳过, 避免 greedy 同表复现原错。
     if rethink_rerank:
-        _reranked_table = sample.get("atg_reranked_table") or sample.get("atgo_reranked_table")
+        _reranked_table = sample.get("_rethink_rerank_table")
         if _reranked_table and _reranked_table != sample.get("table_text"):
             from refine.TableQA.utils.chain import regen_chain_from_scratch_one_sample, get_table_info
             from refine.TableQA.operations.final_query import simple_query_cot_original
             from critic.TableQA.tools import judge_exec_one_sample as _rethink_judge
             try:
+                rethought = copy.deepcopy(judge_sample)
+                rethought["atg_reranked_table"] = _reranked_table
                 rethought = regen_chain_from_scratch_one_sample(
-                    judge_sample, llm=llm, llm_options=llm_options
+                    rethought, llm=llm, llm_options=llm_options
                 )
                 rethought = simple_query_cot_original(
                     rethought,

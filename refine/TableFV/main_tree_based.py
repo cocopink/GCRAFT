@@ -116,9 +116,9 @@ def main(
                 injected += 1
         print(f"[P6] graph judge enabled for {injected} samples")
 
-    # [Rethink-Rerank] 图增强后移: 按 ids 合并重排表至 atg_reranked_table 字段。
-    # 推理执行走 get_table_info 回落链 (重排表优先), Judge/Critic 判卷仍读原 table_text。
-    # 仅在 judge 判 incorrect 后由 controller 触发重推, thought 基线不受影响。
+    # [Rethink-Rerank] 图增强后移: 按 ids 合并重排表至独立字段 _rethink_rerank_table。
+    # ★ 表隔离: 该字段不被 get_table_info 回落链认识, 修正循环 (FULL) 仍在原表执行;
+    #   仅 controller 重推分支内部将其临时挂载为 atg_reranked_table, 重推结束后丢弃。
     if rethink_rerank and rethink_rerank_jsonl:
         import json
         rerank_by_ids = {}
@@ -137,7 +137,7 @@ def main(
                 continue
             tbl = rerank_by_ids.get(sample.get("ids"))
             if tbl:
-                sample["atg_reranked_table"] = tbl
+                sample["_rethink_rerank_table"] = tbl
                 merged += 1
         print(f"[Rethink-Rerank] merged reranked tables for {merged} samples from {rethink_rerank_jsonl}")
     elif rethink_rerank:
