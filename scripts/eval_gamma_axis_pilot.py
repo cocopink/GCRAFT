@@ -64,6 +64,9 @@ def main(out: str = "docs/gamma_axis_pilot_results.md"):
                             tsv_unescape_list(stuff["targetCanon"]))
             ok = lambda s: wikitq_match_func(s, tvm[s["ids"]], "top")
         else:
+            # 清除 QA 侧已缓存的 utils 模块, 避免 FV 的 utils.evaluate 撞 QA 缓存
+            for k in [k for k in sys.modules if k == "utils" or k.startswith("utils.")]:
+                del sys.modules[k]
             sys.path.insert(0, os.path.join(ROOT, "thought", "TableFV"))
             from utils.evaluate import tabfact_match_func
 
@@ -72,7 +75,7 @@ def main(out: str = "docs/gamma_axis_pilot_results.md"):
         raw = load_by_tk(os.path.join(ROOT, c1_rel))
         v2 = load_by_tk(os.path.join(ROOT, v2_rel))
         with open(os.path.join(ROOT, f"thought/Table{'QA' if ds.startswith('QA') else 'FV'}/data/{data_dir}/gamma_pilot_ids.json")) as f:
-            pilot_keys = set(json.load(f))
+            pilot_keys = set(tuple(k) for k in json.load(f))
 
         # 子集: 抽样清单内、管线口径下的 gold 错误
         wrong_tk = [tk for tk in raw
