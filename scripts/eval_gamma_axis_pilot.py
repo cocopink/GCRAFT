@@ -16,7 +16,7 @@ import sys
 import fire
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GAMMAS = ["0", "0.1", "0.5", "0.7"]
+GAMMAS = ["0", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1.0"]
 AXES = ["row", "col", "rowcol"]
 
 
@@ -84,6 +84,7 @@ def main(out: str = "docs/gamma_axis_pilot_results.md"):
         n_tree = len([tk for tk in wrong_tk if tk in v2])
         print(f"[{ds}] gold 错误 {len(wrong_tk)} (v2 覆盖 {n_tree}), "
               f"修正循环修复 {len(tree_fixed)} ({100*len(tree_fixed)/max(n_tree,1):.1f}%)")
+        pivot = {}
 
         for g in GAMMAS:
             for m in AXES:
@@ -101,6 +102,26 @@ def main(out: str = "docs/gamma_axis_pilot_results.md"):
                     f"{100*len(union)/max(n_tree,1):.1f}% | "
                     f"{100*(len(union)-len(tree_fixed))/max(n_tree,1):+.1f}pp |")
                 print(lines[-1])
+                pivot[(g, m)] = (100*len(fixed)/max(len(jud),1),
+                                 100*len(union)/max(n_tree,1),
+                                 100*(len(union)-len(tree_fixed))/max(n_tree,1))
+        lines.append("")
+
+        # 透视表 (γ 为行, 轴为列, 单元格: 修复率 → 并集 (+互补增量))
+        base = 100*len(tree_fixed)/max(n_tree,1)
+        lines.append(f"### {ds} — 修正循环基线 {base:.1f}% ({len(tree_fixed)}/{n_tree})")
+        lines.append("")
+        lines.append("| γ | row | col | rowcol |")
+        lines.append("|---|---|---|---|")
+        for g in GAMMAS:
+            cells = []
+            for m in AXES:
+                if (g, m) in pivot:
+                    fr, ur, dd = pivot[(g, m)]
+                    cells.append(f"{fr:.1f}% → {ur:.1f}% ({dd:+.1f})")
+                else:
+                    cells.append("(未完成)")
+            lines.append(f"| {g} | " + " | ".join(cells) + " |")
         lines.append("")
 
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
