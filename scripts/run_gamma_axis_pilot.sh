@@ -10,7 +10,7 @@
 set -u
 cd /root/code/GCRAFT
 
-GAMMAS="0 0.1 0.5 0.7"
+GAMMAS="${GAMMAS:-0 0.1 0.5 0.7}"
 AXES="row col rowcol"
 BASE_URL="http://127.0.0.1:8000/v1"
 API_KEY="EMPTY"
