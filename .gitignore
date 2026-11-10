@@ -36,6 +36,17 @@
 /table_structure/__pycache__/
 /tests/__pycache__/
 /thought/**/__pycache__/
+/__pycache__/
+/memory/__pycache__/
+.ipynb_checkpoints/
+
+# 本地实验结果（results 为指向 autodl-tmp 的符号链接；v2 为大体积输出）
+/results
+/results_v2/
+
+# Gamma×Axis pilot 派生重排数据（可由 scripts/run_gamma_axis_pilot.sh 重新生成）
+/thought/TableQA/data/*/gamma_pilot_*
+/thought/TableFV/data/*/gamma_pilot_*
 
 # One-off local files
 /CLAUDE.md
