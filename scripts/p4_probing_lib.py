@@ -93,10 +93,14 @@ def parse_col_names(operation: Dict) -> List[str]:
 
 # ==================== 链追踪 (不重放表内容) ====================
 
-def trace_row_sets(sample: Dict) -> Optional[Dict]:
+def trace_row_sets(sample: Dict, require_scores: bool = True) -> Optional[Dict]:
     """增量行/列集合追踪 (P4 特征 + P5 EXCLUDES/DEPENDS_ON 的共享基础)。
 
     只跟踪集合 memberships, 不重放表内容 (零 deepcopy 开销)。
+
+    Args:
+        require_scores: True (P4 特征口径) 时缺图分数返回 None;
+            False (P5 注入/集合口径) 时允许无分数样本, col_scores_norm 为空 dict。
 
     Returns:
         {
@@ -111,7 +115,7 @@ def trace_row_sets(sample: Dict) -> Optional[Dict]:
           "rows_final", "cols_final": 终态集合,
           "unmatched_cols": F1 对齐失败列名列表,
         }
-        样本缺图分数/表时返回 None。
+        样本缺表 (或缺图分数且 require_scores) 时返回 None。
     """
     row_scores = sample.get("row_relevance_scores") or {}
     col_scores = sample.get("col_relevance_scores") or {}
@@ -121,7 +125,7 @@ def trace_row_sets(sample: Dict) -> Optional[Dict]:
         or sample.get("table_text")
         or sample.get("table")
     )
-    if not row_scores or not col_scores or not table:
+    if not table or (require_scores and (not row_scores or not col_scores)):
         return None
 
     num_rows_init = len(table) - 1  # 数据行数 (不含表头)

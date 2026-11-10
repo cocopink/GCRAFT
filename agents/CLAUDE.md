@@ -8,6 +8,9 @@
 
 ## 变更记录 (Changelog)
 
+### 2026-11-07 (示例补充)
+- ClarifierAgent 小节追加真实样本示例（tabfact test-9，表 `1-24560733-1.html.csv`；纯规则离线计算结果，tabfact 侧无落盘缓存）
+
 ### 2026-09-21 (增量更新)
 - 修正测试章节：`tests/test_table_analyzer.py` 当前不存在（/tests/ 被忽略且目录缺失）
 - 补充 `merge_cache_to_final` 无关说明移除；确认 9 个未接线 agent 名单不变
@@ -100,6 +103,33 @@ sample = clarifier.clarify_sample(sample)
 - `thought/TableQA/main.py`：`use_clarifier=True` 时调用 `clarify_batch(dataset)`
 - 结果保存到 `{thought_results_dir}/clarifier/case_dict_{id}.pkl`
 - Refine 阶段通过 `load_clarifier_info()` 加载
+
+**真实样本示例**（tabfact `test.jsonl` 索引 9，表 `1-24560733-1.html.csv`，statement: *"the most the wildcats outscored an opponent is by 26 points"*，label 0）：
+
+```python
+# python 离线运行 ClarifierAgent().clarify_sample(...) 生成（纯规则，确定性可复现；
+# tabfact 侧当前无落盘缓存，仓库仅存 wikitq qwen3.5-4b_axis_col 一批）
+{
+  "headers": ["game", "date", "opponent", "result", "wildcats points", "opponents", "record"],
+  "entities": {
+    "dates": ["sept 20", "sept 27", "oct 4", "oct 11", "oct 18"],   # date 列前 5 值
+    "numeric_fields": ["wildcats points"]                            # 含 points 关键词的列
+  },
+  "units": {},                        # 前 10 行未命中单位正则（无 %/$/时间/小数模式）
+  "question_keywords": {
+    "numbers": ["26"],                # 问题中的数字
+    "comparisons": ["most"],          # 命中比较词表
+    "operations": [],
+    "matched_columns": ["opponent", "wildcats points"]  # 列头词出现在问题中
+  },
+  "column_mapping": {                 # 问题词 → 列名对齐
+    "opponent": "opponent",
+    "wildcats": "wildcats points"     # 部分词匹配：问题里的 "wildcats" 对齐到得分列
+  }
+}
+```
+
+> 该示例展示了 Clarifier 的典型价值：问题说 "wildcats ... outscored"（净胜分），`column_mapping` 将 "wildcats" 对齐到 `wildcats points` 列而非 `opponents` 列，供 Refine 的 select_column / sort_by 操作判断 max 差值时正确选列。
 
 ### 2. RetrieverAgent（Stage 2）
 

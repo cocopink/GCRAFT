@@ -41,7 +41,7 @@ def _table_of(sample):
 
 def _find_steps(sample, op_name):
     """返回 [(chain 下标, trace 1-based 步号)] 的 select 类操作列表。"""
-    trace = trace_row_sets(sample)
+    trace = trace_row_sets(sample, require_scores=False)
     if trace is None:
         return [], None
     hits = []
@@ -55,7 +55,7 @@ def _find_steps(sample, op_name):
 
 
 def _terminal_state(sample):
-    trace = trace_row_sets(sample)
+    trace = trace_row_sets(sample, require_scores=False)
     if trace is None:
         return None
     pred = None

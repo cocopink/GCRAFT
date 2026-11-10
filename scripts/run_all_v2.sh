@@ -36,7 +36,7 @@ run_refine() {  # $1=tag $2=ds $3=task_dir $4=thought_dir(绝对) $5=out_dir $6=
     [ "$ds" = tabfact ] && extra="--raw2clean_path $repo/thought/$tdir/data/tabfact/raw2clean.jsonl"
     echo "[$(date -Is)] ======== refine $tag ========"
     mkdir -p "$out"
-    python3 - "$tag" "$ds" "$CURRENT" "$repo" "$out" << 'PYEOF'
+    python3 - "$tag" "$ds" "$CURRENT" "$repo" "$out" << PYEOF
 import json, hashlib, os, sys, time
 tag, ds, size, repo, out = sys.argv[1:6]
 tree = f"{repo}/critic/{'TableQA' if ds=='wikitq' else 'TableFV'}/tools/few_shot_critic.json"

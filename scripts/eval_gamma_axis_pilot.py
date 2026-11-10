@@ -77,11 +77,13 @@ def main(out: str = "docs/gamma_axis_pilot_results.md"):
         with open(os.path.join(ROOT, f"thought/Table{'QA' if ds.startswith('QA') else 'FV'}/data/{data_dir}/gamma_pilot_ids.json")) as f:
             pilot_keys = set(tuple(k) for k in json.load(f))
 
-        # 子集: 抽样清单内、管线口径下的 gold 错误
-        wrong_tk = [tk for tk in raw
-                    if (tk[0], tk[1], tk[2]) in pilot_keys and ok(raw[tk]) is False]
+        # 子集: 抽样清单全部计入, 统一分母 = 200 (用户指定)。
+        # FV: 1 个 TabFact 重复键 (statement+table_id ×5 对) 错位样本按错误样本处理,
+        #     其重推/修正循环判定均基于同一物理行, 口径一致;
+        # QA: 1 个 v2-None 样本 (当年修正失败记录) 在并集中按"修正循环未修复"处理。
+        wrong_tk = [tk for tk in raw if (tk[0], tk[1], tk[2]) in pilot_keys]
         tree_fixed = {tk for tk in wrong_tk if tk in v2 and ok(v2[tk]) is True}
-        n_tree = len([tk for tk in wrong_tk if tk in v2])
+        n_tree = len(wrong_tk)
         print(f"[{ds}] gold 错误 {len(wrong_tk)} (v2 覆盖 {n_tree}), "
               f"修正循环修复 {len(tree_fixed)} ({100*len(tree_fixed)/max(n_tree,1):.1f}%)")
         pivot = {}

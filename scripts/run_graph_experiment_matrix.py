@@ -228,6 +228,11 @@ def _refine_cmd(python_bin, spec, thought_dir, exp_dir, config, args):
         _bool_arg(config["enable_p2"]),
         "--bias_weight",
         str(P3_BIAS_WEIGHT if config["enable_p3"] else 0.0),
+        # 每配置私有进化树 (对齐 run_QA_vllm.sh FROZEN_MEMORY=False 语义):
+        # 不传时 controller 空值回退 canonical 树 (controller.py: error_tree_json or
+        # CRITIC_TREE_JSON), UPDATE_TREE 会污染共享知识库且重复运行间树状态漂移
+        "--critic_tree_json",
+        str(exp_dir / "refine" / "memory" / "few_shot_critic.json"),
     ]
     return cmd
 

@@ -135,10 +135,41 @@ def main():
 
     if args.critic_pkl:
         with open(args.critic_pkl, "rb") as f:
-            critic_payload = pickle.load(f)
+            critic_loc = pickle.load(f)
+        # 口径对齐: critic 基线输出形态与排序法不同构——
+        #   [Incorrect] Step N → 定位预测 (单步); FIXED → 修正成功但无步号输出;
+        #   None → 判错且无步号。双口径: 保守 FIXED=miss, 宽松 FIXED=hit。
+        crit_strict = {1: [], 3: []}
+        crit_lenient = {1: [], 3: []}
+        n_fixed = 0
+        for item in injected:
+            label_step = item["injection"]["label_step"]
+            if label_step is None:
+                continue
+            sid = item["sample"].get("id") or item["sample"].get("table_id")
+            loc = critic_loc.get(sid)
+            if loc == "FIXED":
+                n_fixed += 1
+                crit_strict[1].append(0); crit_strict[3].append(0)
+                crit_lenient[1].append(1); crit_lenient[3].append(1)
+            else:
+                ranked = [loc] if isinstance(loc, int) else []
+                crit_strict[1].append(1 if label_step in ranked[:1] else 0)
+                crit_strict[3].append(1 if label_step in ranked[:3] else 0)
+                crit_lenient[1].append(crit_strict[1][-1])
+                crit_lenient[3].append(crit_strict[3][-1])
         lines.append("")
-        lines.append("## 方法 (c): critic 定位基线")
-        lines.append(f"- 已读入 {args.critic_pkl}: {len(critic_payload)} 条 (Hit 计算需 critic 定位步号字段, 口径对齐后补入)")
+        lines.append("## 方法 (c): critic 定位基线 (双口径)")
+        lines.append(f"- 来源: {args.critic_pkl} ({len(critic_loc)} 条)")
+        lines.append(f"- 注入集上修正成功 (FIXED, 无步号输出): {n_fixed} 条")
+        lines.append(f"- 口径 A 保守 (FIXED=miss): Hit@1 {sum(crit_strict[1])}/{len(crit_strict[1])} "
+                     f"({sum(crit_strict[1])/max(len(crit_strict[1]),1)*100:.1f}%), "
+                     f"Hit@3 {sum(crit_strict[3])}/{len(crit_strict[3])} "
+                     f"({sum(crit_strict[3])/max(len(crit_strict[3]),1)*100:.1f}%)")
+        lines.append(f"- 口径 B 宽松 (FIXED=hit, 修正成功隐含定位成功): Hit@1 {sum(crit_lenient[1])}/{len(crit_lenient[1])} "
+                     f"({sum(crit_lenient[1])/max(len(crit_lenient[1]),1)*100:.1f}%), "
+                     f"Hit@3 {sum(crit_lenient[3])}/{len(crit_lenient[3])} "
+                     f"({sum(crit_lenient[3])/max(len(crit_lenient[3]),1)*100:.1f}%)")
     else:
         lines.append("")
         lines.append("## 方法 (c): critic 定位基线")
