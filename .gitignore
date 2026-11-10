@@ -47,6 +47,10 @@
 # Gamma×Axis pilot 派生重排数据（可由 scripts/run_gamma_axis_pilot.sh 重新生成）
 /thought/TableQA/data/*/gamma_pilot_*
 /thought/TableFV/data/*/gamma_pilot_*
+/thought/TableQA/data/*/pilot_incorrect_*
+/thought/TableQA/data/*/pilot_rerank_cache_*
+/thought/TableFV/data/*/pilot_incorrect_*
+/thought/TableFV/data/*/pilot_rerank_cache_*
 
 # One-off local files
 /CLAUDE.md
